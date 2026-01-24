@@ -3,5 +3,113 @@ body {
   margin: 0;
   padding: 0;
   overflow: hidden;
-  color: black;
+  background: black;
+}
+
+/* ===========================================
+   TOGGLE EFFECTS - Add these classes to the canvas
+   in gameOfLife.html to try different looks
+   =========================================== */
+
+/* GLOW - soft bloom effect */
+.glow {
+  filter: blur(1px) brightness(1.2);
+}
+
+/* INTENSE GLOW - stronger bloom */
+.glow-intense {
+  filter: blur(2px) brightness(1.5) contrast(1.2);
+}
+
+/* NEON - high contrast neon look */
+.neon {
+  filter: contrast(1.5) saturate(1.5) brightness(1.1);
+}
+
+/* DREAMY - soft, ethereal look */
+.dreamy {
+  filter: blur(1.5px) saturate(0.8) brightness(1.3);
+}
+
+/* RETRO - old CRT monitor vibe */
+.retro {
+  filter: contrast(1.3) saturate(0.7) sepia(0.2);
+}
+
+/* PSYCHEDELIC - rotating hue (animated) */
+.psychedelic {
+  animation: hue-cycle 5s linear infinite;
+}
+
+@keyframes hue-cycle {
+  from { filter: hue-rotate(0deg); }
+  to { filter: hue-rotate(360deg); }
+}
+
+/* PULSE - subtle breathing animation */
+.pulse {
+  animation: pulse-anim 2s ease-in-out infinite;
+}
+
+@keyframes pulse-anim {
+  0%, 100% { filter: brightness(1); }
+  50% { filter: brightness(1.3); }
+}
+
+/* VAPORWAVE - pink/cyan tint */
+.vaporwave {
+  filter: hue-rotate(280deg) saturate(1.4) contrast(1.1);
+}
+
+/* MATRIX - green tint */
+.matrix {
+  filter: hue-rotate(80deg) saturate(2) brightness(1.1);
+}
+
+/* FIRE - warm orange/red tint */
+.fire {
+  filter: hue-rotate(-30deg) saturate(1.8) contrast(1.2);
+}
+
+/* INVERTED - flip all colors */
+.inverted {
+  filter: invert(1);
+}
+
+/* GRAYSCALE - black and white */
+.grayscale {
+  filter: grayscale(1) contrast(1.3);
+}
+
+/* SCANLINES - CRT scanline overlay */
+.scanlines::after {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(0, 0, 0, 0.2) 0px,
+    rgba(0, 0, 0, 0.2) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+}
+
+/* SHADOW - drop shadow for depth */
+.shadow {
+  filter: drop-shadow(0 0 10px rgba(255, 255, 255, 0.3));
+}
+
+/* ZOOM-PULSE - subtle zoom breathing */
+.zoom-pulse {
+  animation: zoom-anim 3s ease-in-out infinite;
+}
+
+@keyframes zoom-anim {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.02); }
 }

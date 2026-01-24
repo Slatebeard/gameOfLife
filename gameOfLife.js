@@ -3,6 +3,21 @@
 // ================================
 
 const canvas = document.getElementById('liveCanvas');
+//canvas.classList.add("glow")
+//canvas.classList.add("glow-intense")
+//canvas.classList.add("neon")
+//canvas.classList.add("dreamy")
+//canvas.classList.add("retro")
+//canvas.classList.add("psychedelic")
+//canvas.classList.add("pulse")
+//canvas.classList.add("vaporwave")
+//canvas.classList.add("matrix")
+//canvas.classList.add("fire")
+//canvas.classList.add("inverted")
+//canvas.classList.add("scanlines")
+//canvas.classList.add("shadow")
+//canvas.classList.add("zoom-pulse")
+
 
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
@@ -14,10 +29,31 @@ const canvasContext = canvas.getContext('2d');
 // 2. CONFIG
 // ================================
 
-const cellSize = 10;
-const frameRate = 30; // frames per second
+const cellSize = 8;
+const frameRate = 15;
 const frameInterval = 1000 / frameRate;
-const colors = ['black', 'red', 'lime', 'blue', 'yellow'];
+const trailFade = 0.1; // higher = faster fade
+
+const teamColors = [
+    '#000000', // dead dont touch
+    '#721e1eff',
+    '#3ba53bff',
+    '#4e4eb2ff',
+    '#bc11a8ff'
+];
+
+function hexToRGB(hex) {
+    // regex magic, no idea how it works, thanks gippity
+    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})?$/i.exec(hex);
+
+    return result ? [
+        parseInt(result[1], 16),
+        parseInt(result[2], 16),
+        parseInt(result[3], 16)
+    ] : [0, 0, 0];
+}
+
+const colorRGB = teamColors.map(hexToRGB);
 
 
 // ================================
@@ -44,28 +80,54 @@ for (let r = 0; r < rows; r++) {
     grid.push(row);
 }
 
+// Trail grid stores {color, brightness} for fade effect
+let trailGrid = [];
+for (let r = 0; r < rows; r++) {
+    const row = [];
+    for (let c = 0; c < cols; c++) {
+        const color = grid[r][c];
+        row.push({ color: color, brightness: color > 0 ? 1 : 0 });
+    }
+    trailGrid.push(row);
+}
+
 
 // ================================
 // 4. DRAW
 // ================================
 
-function drawGrid(grid) {
-
-    for (let row = 0; row < grid.length; row++) {
-        for (let col = 0; col < grid[row].length; col++) {
-            canvasContext.fillStyle = colors[grid[row][col]];
+function drawGrid() {
+    for (let row = 0; row < trailGrid.length; row++) {
+        for (let col = 0; col < trailGrid[row].length; col++) {
+            const { color, brightness } = trailGrid[row][col];
+            const [r, g, b] = colorRGB[color];
+            canvasContext.fillStyle = `rgb(${r * brightness}, ${g * brightness}, ${b * brightness})`;
             canvasContext.fillRect(
                 col * cellSize,
                 row * cellSize,
                 cellSize,
                 cellSize
             );
-
         }
     }
 }
 
-drawGrid(grid);
+function updateTrail() {
+    for (let row = 0; row < grid.length; row++) {
+        for (let col = 0; col < grid[row].length; col++) {
+            const cell = grid[row][col];
+            if (cell > 0) {
+                // Alive: full brightness, update color
+                trailGrid[row][col] = { color: cell, brightness: 1 };
+            } else {
+                // Dead: fade brightness, keep last color
+                trailGrid[row][col].brightness = Math.max(0, trailGrid[row][col].brightness - trailFade);
+            }
+        }
+    }
+}
+
+drawGrid();
 
 // ================================
 // 5. ITERATE NEXT GEN
@@ -97,7 +159,8 @@ function getNeighborInfo(row, col, currentGrid) {
         }
     }
 
-    // Find dominant color (random tie-break)
+
+    // tie brake if multiple colors have same max count
     let maxCount = 0;
     let dominantColors = [];
 
@@ -135,14 +198,12 @@ function nextGeneration(currentGrid) {
 
             if (alive) {
                 if (count === 2 || count === 3) {
-                    // Survive, but take dominant neighbor color (can be "eaten")
                     newRow.push(dominantColor);
                 } else {
                     newRow.push(0); // die
                 }
             } else {
                 if (count === 3) {
-                    // Born with dominant neighbor color
                     newRow.push(dominantColor);
                 } else {
                     newRow.push(0); // stay dead
@@ -165,7 +226,8 @@ function step(currentTime) {
 
     canvasContext.clearRect(0, 0, canvas.width, canvas.height);
     grid = nextGeneration(grid);
-    drawGrid(grid);
+    updateTrail();
+    drawGrid();
 }
 
 requestAnimationFrame(step);
