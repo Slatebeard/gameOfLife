@@ -33,7 +33,7 @@ const cellSize = 8;
 const frameRate = 14;
 const frameInterval = 1000 / frameRate;
 const trailFade = 0.005; // higher = faster fade
-let spawnChance = 0.0003;
+let spawnChance = 0.0005;
 const scoreboardInterval = 30;
 
 // game states
@@ -48,7 +48,7 @@ const EVENT_NONE = 'none';
 let currentState = STATE_RUNNING;
 
 const teamColors = [
-    '#000000', // dead dont touch
+    '#000000', // dead dont touch, fully transparent
     '#E63946',
     '#457B9D',
     '#2A9D8F',
@@ -106,6 +106,38 @@ function initTeamColors() {
 }
 initTeamColors();
 
+// Team names database
+const teamNamesData = {
+    categories: {
+        animals: ["Lions", "Tigers", "Bears", "Wolves", "Eagles", "Sharks", "Panthers", "Falcons"],
+        mythology: ["Titans", "Phoenixes", "Dragons", "Valkyries", "Hydras", "Griffins", "Krakens", "Sphinxes"],
+        elements: ["Inferno", "Tempest", "Avalanche", "Thunder", "Cyclone", "Tsunami", "Blizzard", "Earthquake"],
+        space: ["Novas", "Comets", "Nebulas", "Pulsars", "Quasars", "Asteroids", "Meteors", "Galaxies"],
+        nature: ["Redwoods", "Hurricanes", "Volcanoes", "Glaciers", "Tornadoes", "Monsoons", "Willows", "Sequoias"]
+    }
+};
+
+// Assign random team names
+function assignRandomTeamNames() {
+    // Get all category keys and pick one randomly
+    const categoryKeys = Object.keys(teamNamesData.categories);
+    const randomCategory = categoryKeys[Math.floor(Math.random() * categoryKeys.length)];
+    const names = teamNamesData.categories[randomCategory];
+
+    // Shuffle and pick 4 unique names
+    const shuffled = [...names].sort(() => Math.random() - 0.5);
+    const selectedNames = shuffled.slice(0, 4);
+
+    // Assign to team name elements
+    for (let i = 1; i <= 4; i++) {
+        const el = document.getElementById(`name-${i}`);
+        if (el) el.textContent = selectedNames[i - 1];
+    }
+}
+
+// Assign names at startup
+assignRandomTeamNames();
+
 
 // ================================
 // 3. INIT STATE
@@ -118,7 +150,6 @@ const cols = Math.floor(canvas.width / cellSize);
 
 for (let r = 0; r < rows; r++) {
     const row = [];
-
     for (let c = 0; c < cols; c++) {
         if (Math.random() < 0.5) {
             row.push(0); // dead
@@ -127,11 +158,9 @@ for (let r = 0; r < rows; r++) {
             row.push(Math.floor(Math.random() * 4) + 1);
         }
     }
-
     grid.push(row);
 }
 
-// Trail grid stores {color, brightness} for fade effect
 let trailGrid = [];
 for (let r = 0; r < rows; r++) {
     const row = [];
@@ -191,10 +220,8 @@ function getNeighborInfo(row, col, currentGrid) {
     for (let rOffset = -1; rOffset <= 1; rOffset++) {
         for (let cOffset = -1; cOffset <= 1; cOffset++) {
             if (rOffset === 0 && cOffset === 0) continue;
-
             const nRow = row + rOffset;
             const nCol = col + cOffset;
-
             if (
                 nRow >= 0 &&
                 nRow < currentGrid.length &&
@@ -209,12 +236,9 @@ function getNeighborInfo(row, col, currentGrid) {
             }
         }
     }
-
-
     // tie brake if multiple colors have same max count
     let maxCount = 0;
     let dominantColors = [];
-
     for (let i = 1; i <= 4; i++) {
         if (colorCounts[i] > maxCount) {
             maxCount = colorCounts[i];
@@ -223,18 +247,12 @@ function getNeighborInfo(row, col, currentGrid) {
             dominantColors.push(i);
         }
     }
-
     const dominantColor =
         dominantColors.length > 0
             ? dominantColors[Math.floor(Math.random() * dominantColors.length)]
             : 0;
-
     return { count, dominantColor };
 }
-
-
-
-
 
 function nextGeneration(currentGrid) {
     const newGrid = [];
