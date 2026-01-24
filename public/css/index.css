@@ -12,8 +12,22 @@ body {
   margin: 0;
   padding: 0;
   overflow: hidden;
-  background: black;
+  background: rgb(230, 223, 223);
   font-family: var(--main-font);
+}
+
+#backgroundCanvas {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 0;
+}
+
+#liveCanvas {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 1;
 }
 
 #header-bar {
@@ -47,6 +61,43 @@ body {
   color: red;
   font-size: 40px;
   border-right: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+#event-text.event-active {
+  display: inline-block;
+  animation: event-pulse 0.5s ease-in-out infinite;
+}
+
+@keyframes event-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  10%,
+  30%,
+  50%,
+  70%,
+  90% {
+    transform: translateX(-3px);
+  }
+  20%,
+  40%,
+  60%,
+  80% {
+    transform: translateX(3px);
+  }
+}
+
+@keyframes event-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.7;
+    transform: scale(1.05);
+  }
 }
 
 .middleSection {

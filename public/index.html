@@ -9,7 +9,7 @@
 
 <body>
     <div id="header-bar">
-        <div class="leftSection">NO EVENT</div>
+        <div class="leftSection"><span id="event-text">NO EVENT</span></div>
         <div class="middleSection">
             <div id="clock"></div>
             <div id="date"></div>
@@ -25,6 +25,7 @@
                     class="team-count">0</span></div>
         </div>
     </div>
+    <canvas id="backgroundCanvas"></canvas>
     <canvas id="liveCanvas"></canvas>
 
     <div id="keybinds">
@@ -33,9 +34,11 @@
         <div><span class="key">2</span> Running</div>
         <div><span class="key">3</span> Paused</div>
         <div><span class="key">4</span> Game Over</div>
+        <div><span class="key">5</span> Event</div>
         <div><span class="key">H</span> Toggle Help</div>
     </div>
 
+    <script src="js/background.js"></script>
     <script src="js/gameOfLife.js"></script>
 
 

@@ -35,7 +35,7 @@ const frameInterval = 1000 / frameRate;
 const trailFade = 0.005; // closer to 1 = faster fade
 let spawnChance = 0.0005;
 const scoreboardInterval = 5;
-const showKeybinds = true; // toggle keybinds panel visibility
+const showKeybinds = false; // toggle keybinds panel visibility
 
 // game states
 const STATE_PRE_RUN = 'preRun';
@@ -45,10 +45,17 @@ const STATE_PAUSED = 'paused';
 
 
 // event states
-const EVENT_NONE = 'none';
 const EVENT_COMETS = 'comets';
 
-let currentState = STATE_PAUSED;
+// comet event config
+const cometMinRadius = 3;
+const cometMaxRadius = 12;
+
+
+const cometSpawnInterval = Math.floor(Math.random() * 12) + 2; // spawn every 2-10 frames
+
+let currentState = STATE_RUNNING;
+let currentEvent = null;
 
 const teamColors = [
     '#000000', // dead dont touch, fully transparent
@@ -177,8 +184,10 @@ function drawGrid() {
     for (let row = 0; row < trailGrid.length; row++) {
         for (let col = 0; col < trailGrid[row].length; col++) {
             const { color, brightness } = trailGrid[row][col];
+            // Skip fully faded cells to show background through canvas
+            if (brightness === 0) continue;
             const [r, g, b] = colorRGB[color];
-            canvasContext.fillStyle = `rgb(${r * brightness}, ${g * brightness}, ${b * brightness})`;
+            canvasContext.fillStyle = `rgba(${r * brightness}, ${g * brightness}, ${b * brightness}, ${brightness})`;
             canvasContext.fillRect(
                 col * cellSize,
                 row * cellSize,
@@ -204,13 +213,42 @@ function updateTrail() {
 
 drawGrid();
 
+
 // ================================
-// 5. ITERATE NEXT GEN
+// 5. EVENTS
+// ================================
+
+function spawnExplosion() {
+    const centerRow = Math.floor(Math.random() * rows);
+    const centerCol = Math.floor(Math.random() * cols);
+    const radius = Math.floor(Math.random() * (cometMaxRadius - cometMinRadius + 1)) + cometMinRadius;
+    const color = 0
+
+    for (let r = -radius; r <= radius; r++) {
+        for (let c = -radius; c <= radius; c++) {
+            // Check if within circle
+            if (r * r + c * c <= radius * radius) {
+                const targetRow = centerRow + r;
+                const targetCol = centerCol + c;
+                // Bounds check
+                if (targetRow >= 0 && targetRow < rows && targetCol >= 0 && targetCol < cols) {
+                    grid[targetRow][targetCol] = color;
+                    // Set brightness to 0 for dead cells (transparent holes)
+                    trailGrid[targetRow][targetCol] = { color: color, brightness: color > 0 ? 1 : 0 };
+                }
+            }
+        }
+    }
+}
+
+
+// ================================
+// 6. ITERATE NEXT GEN
 // ================================
 
 function getNeighborInfo(row, col, currentGrid) {
     let count = 0;
-    const colorCounts = [0, 0, 0, 0, 0]; // index 0 unused, 1-4 for colors
+    const colorCounts = [0, 0, 0, 0, 0]; // index 0 used for dead, 1-4 for colors
 
     for (let rOffset = -1; rOffset <= 1; rOffset++) {
         for (let cOffset = -1; cOffset <= 1; cOffset++) {
@@ -270,7 +308,6 @@ function nextGeneration(currentGrid) {
                 if (count === 3) {
                     newRow.push(dominantColor);
                 } else if (Math.random() < spawnChance) {
-                    // Random spawn to prevent stagnation
                     newRow.push(Math.floor(Math.random() * 4) + 1);
                 } else {
                     newRow.push(0); // stay dead
@@ -294,6 +331,19 @@ function step(currentTime) {
     frameCount++;
 
     updateClock();
+
+    // Event takes priority over game state
+    if (currentEvent === EVENT_COMETS) {
+        canvasContext.clearRect(0, 0, canvas.width, canvas.height);
+        if (frameCount % cometSpawnInterval === 0) {
+            spawnExplosion();
+        }
+        if (frameCount % scoreboardInterval === 0) {
+            updateScoreboard();
+        }
+        drawGrid();
+        return;
+    }
 
     if (currentState === STATE_GAME_OVER) {
         return;
@@ -324,10 +374,11 @@ requestAnimationFrame(step);
 
 
 // ================================
-// 6. KEYBINDS
+// 7. KEYBINDS
 // ================================
 
 const keybindsEl = document.getElementById('keybinds');
+const eventTextEl = document.getElementById('event-text');
 
 // Show keybinds on load if config enabled
 if (showKeybinds && keybindsEl) {
@@ -347,6 +398,22 @@ document.addEventListener('keydown', (e) => {
             break;
         case '4':
             currentState = STATE_GAME_OVER;
+            break;
+        case '5':
+            if (currentEvent === EVENT_COMETS) {
+                currentEvent = null;
+                currentState = STATE_RUNNING;
+                if (eventTextEl) {
+                    eventTextEl.textContent = 'NO EVENT';
+                    eventTextEl.classList.remove('event-active');
+                }
+            } else {
+                currentEvent = EVENT_COMETS;
+                if (eventTextEl) {
+                    eventTextEl.textContent = 'COMETS!';
+                    eventTextEl.classList.add('event-active');
+                }
+            }
             break;
         case 'h':
         case 'H':
