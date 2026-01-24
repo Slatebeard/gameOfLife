@@ -30,25 +30,29 @@ const canvasContext = canvas.getContext('2d');
 // ================================
 
 const cellSize = 8;
-const frameRate = 30;
+const frameRate = 14;
 const frameInterval = 1000 / frameRate;
-const trailFade = 0.05; // higher = faster fade
-const spawnChance = 0.0005;
+const trailFade = 0.005; // higher = faster fade
+let spawnChance = 0.0003;
 const scoreboardInterval = 30;
 
-// Game states
+// game states
 const STATE_PRE_RUN = 'preRun';
 const STATE_RUNNING = 'running';
 const STATE_GAME_OVER = 'gameOver';
 
-let currentState = STATE_PRE_RUN;
+
+// event states
+const EVENT_NONE = 'none';
+
+let currentState = STATE_RUNNING;
 
 const teamColors = [
     '#000000', // dead dont touch
-    '#00f7ffff',
-    '#ff0000ff',
-    '#6802c1ff',
-    '#ec07ddff'
+    '#E63946',
+    '#457B9D',
+    '#2A9D8F',
+    '#F4A261'
 ];
 
 function hexToRGB(hex) {
@@ -85,8 +89,12 @@ function updateScoreboard() {
 function updateClock() {
     const now = new Date();
     const time = now.toLocaleTimeString('en-GB'); // HH:MM:SS format
-    const clock = document.getElementById('clock');
-    if (clock) clock.textContent = time;
+    const date = now.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+
+    const clockEl = document.getElementById('clock');
+    const dateEl = document.getElementById('date');
+    if (clockEl) clockEl.textContent = time;
+    if (dateEl) dateEl.textContent = date;
 }
 
 // Apply team colors from JS to DOM
@@ -275,12 +283,10 @@ function step(currentTime) {
     updateClock();
 
     if (currentState === STATE_GAME_OVER) {
-        // Don't update simulation, just keep displaying final state
         return;
     }
 
     if (currentState === STATE_PRE_RUN) {
-        // Only draw initial board, don't run simulation
         canvasContext.clearRect(0, 0, canvas.width, canvas.height);
         drawGrid();
         return;

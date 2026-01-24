@@ -38,11 +38,21 @@ body {
 
 .leftSection {
   color: red;
+  border-right: 1px solid rgba(255, 255, 255, 0.3);
 }
 
 .middleSection {
   font-weight: bold;
-  font-size: 30px;
+  flex-direction: column;
+}
+
+#clock {
+  font-size: 40px;
+}
+
+#date {
+  font-size: 14px;
+  opacity: 0.7;
 }
 
 .rightSection {
@@ -54,6 +64,7 @@ body {
   line-height: 1;
   text-align: right;
   gap: 0;
+  border-left: 1px solid rgba(255, 255, 255, 0.3);
 }
 
 .team-row {
@@ -64,13 +75,15 @@ body {
 
 .team-label {
   display: inline-block;
-  width: 80px;
+  width: 110px;
   text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
 }
 
 .team-count {
   display: inline-block;
-  width: 50px;
+  width: 70px;
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
