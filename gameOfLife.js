@@ -30,9 +30,10 @@ const canvasContext = canvas.getContext('2d');
 // ================================
 
 const cellSize = 8;
-const frameRate = 15;
+const frameRate = 60;
 const frameInterval = 1000 / frameRate;
 const trailFade = 0.1; // higher = faster fade
+const spawnChance = 0.0005; // chance for dead cell to randomly spawn
 
 const teamColors = [
     '#000000', // dead dont touch
@@ -205,6 +206,9 @@ function nextGeneration(currentGrid) {
             } else {
                 if (count === 3) {
                     newRow.push(dominantColor);
+                } else if (Math.random() < spawnChance) {
+                    // Random spawn to prevent stagnation
+                    newRow.push(Math.floor(Math.random() * 4) + 1);
                 } else {
                     newRow.push(0); // stay dead
                 }
