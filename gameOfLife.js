@@ -36,6 +36,13 @@ const trailFade = 0.05; // higher = faster fade
 const spawnChance = 0.0005;
 const scoreboardInterval = 30;
 
+// Game states
+const STATE_PRE_RUN = 'preRun';
+const STATE_RUNNING = 'running';
+const STATE_GAME_OVER = 'gameOver';
+
+let currentState = STATE_PRE_RUN;
+
 const teamColors = [
     '#000000', // dead dont touch
     '#00f7ffff',
@@ -265,14 +272,29 @@ function step(currentTime) {
     lastFrameTime = currentTime;
     frameCount++;
 
-    canvasContext.clearRect(0, 0, canvas.width, canvas.height);
-    grid = nextGeneration(grid);
-    updateTrail();
     updateClock();
-    if (frameCount % scoreboardInterval === 0) {
-        updateScoreboard();
+
+    if (currentState === STATE_GAME_OVER) {
+        // Don't update simulation, just keep displaying final state
+        return;
     }
-    drawGrid();
+
+    if (currentState === STATE_PRE_RUN) {
+        // Only draw initial board, don't run simulation
+        canvasContext.clearRect(0, 0, canvas.width, canvas.height);
+        drawGrid();
+        return;
+    }
+
+    if (currentState === STATE_RUNNING) {
+        canvasContext.clearRect(0, 0, canvas.width, canvas.height);
+        grid = nextGeneration(grid);
+        updateTrail();
+        if (frameCount % scoreboardInterval === 0) {
+            updateScoreboard();
+        }
+        drawGrid();
+    }
 }
 
 requestAnimationFrame(step);
