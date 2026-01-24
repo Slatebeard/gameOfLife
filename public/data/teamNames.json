@@ -1,0 +1,83 @@
+{
+  "categories": {
+    "Animals": [
+      "Lions",
+      "Tigers",
+      "Bears",
+      "Wolves",
+      "Eagles",
+      "Sharks",
+      "Panthers",
+      "Falcons"
+    ],
+    "Mythology": [
+      "Titans",
+      "Phoenixes",
+      "Dragons",
+      "Valkyries",
+      "Hydras",
+      "Griffins",
+      "Krakens",
+      "Sphinxes"
+    ],
+    "Elements": [
+      "Inferno",
+      "Tempest",
+      "Avalanche",
+      "Thunder",
+      "Cyclone",
+      "Tsunami",
+      "Blizzard",
+      "Earthquake"
+    ],
+    "Space": [
+      "Novas",
+      "Comets",
+      "Nebulas",
+      "Pulsars",
+      "Quasars",
+      "Asteroids",
+      "Meteors",
+      "Galaxies"
+    ],
+    "Nature": [
+      "Redwoods",
+      "Hurricanes",
+      "Volcanoes",
+      "Glaciers",
+      "Tornadoes",
+      "Monsoons",
+      "Willows",
+      "Sequoias"
+    ],
+    "Actors": [
+      "Stallone",
+      "Schwarzenegger",
+      "DeNiro",
+      "Pacino",
+      "Hanks",
+      "Clooney",
+      "DiCaprio",
+      "Neeson"
+    ],
+    "Video Game Characters": [
+      "Mario",
+      "Link",
+      "Samus",
+      "Sonic",
+      "Kratos",
+      "Lara Croft",
+      "Master Chief"
+    ],
+    "Pokémon": [
+      "Pikachu",
+      "Charizard",
+      "Bulbasaur",
+      "Squirtle",
+      "Jigglypuff",
+      "Gengar",
+      "Eevee",
+      "Snorlax"
+    ]
+  }
+}
