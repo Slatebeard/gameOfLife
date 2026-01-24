@@ -30,17 +30,18 @@ const canvasContext = canvas.getContext('2d');
 // ================================
 
 const cellSize = 8;
-const frameRate = 60;
+const frameRate = 30;
 const frameInterval = 1000 / frameRate;
-const trailFade = 0.1; // higher = faster fade
-const spawnChance = 0.0005; // chance for dead cell to randomly spawn
+const trailFade = 0.05; // higher = faster fade
+const spawnChance = 0.0005;
+const scoreboardInterval = 30;
 
 const teamColors = [
     '#000000', // dead dont touch
-    '#721e1eff',
-    '#3ba53bff',
-    '#4e4eb2ff',
-    '#bc11a8ff'
+    '#00f7ffff',
+    '#ff0000ff',
+    '#6802c1ff',
+    '#ec07ddff'
 ];
 
 function hexToRGB(hex) {
@@ -55,6 +56,40 @@ function hexToRGB(hex) {
 }
 
 const colorRGB = teamColors.map(hexToRGB);
+
+const teamCounts = [0, 0, 0, 0, 0];
+
+function updateScoreboard() {
+    teamCounts.fill(0);
+
+    for (let r = 0; r < grid.length; r++) {
+        for (let c = 0; c < grid[r].length; c++) {
+            const cell = grid[r][c];
+            if (cell > 0) teamCounts[cell]++;
+        }
+    }
+
+    for (let i = 1; i <= 4; i++) {
+        const el = document.getElementById(`count-${i}`);
+        if (el) el.textContent = teamCounts[i];
+    }
+}
+
+function updateClock() {
+    const now = new Date();
+    const time = now.toLocaleTimeString('en-GB'); // HH:MM:SS format
+    const clock = document.getElementById('clock');
+    if (clock) clock.textContent = time;
+}
+
+// Apply team colors from JS to DOM
+function initTeamColors() {
+    for (let i = 1; i <= 4; i++) {
+        const el = document.querySelector(`.team-${i}`);
+        if (el) el.style.color = teamColors[i];
+    }
+}
+initTeamColors();
 
 
 // ================================
@@ -73,7 +108,7 @@ for (let r = 0; r < rows; r++) {
         if (Math.random() < 0.5) {
             row.push(0); // dead
         } else {
-            // Random color 1-4
+            // random color, like rain
             row.push(Math.floor(Math.random() * 4) + 1);
         }
     }
@@ -221,16 +256,22 @@ function nextGeneration(currentGrid) {
 
 
 let lastFrameTime = 0;
+let frameCount = 0;
 
 function step(currentTime) {
     requestAnimationFrame(step);
 
     if (currentTime - lastFrameTime < frameInterval) return;
     lastFrameTime = currentTime;
+    frameCount++;
 
     canvasContext.clearRect(0, 0, canvas.width, canvas.height);
     grid = nextGeneration(grid);
     updateTrail();
+    updateClock();
+    if (frameCount % scoreboardInterval === 0) {
+        updateScoreboard();
+    }
     drawGrid();
 }
 

@@ -6,6 +6,77 @@ body {
   background: black;
 }
 
+#header-bar {
+  position: fixed;
+  width: 40%;
+  height: auto;
+  top: -1;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 12px 0px;
+  background: rgba(0, 0, 0, 0.668);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.482);
+  border-top: none;
+  color: rgba(255, 255, 255, 0.9);
+  font-family:
+    system-ui,
+    -apple-system,
+    sans-serif;
+  font-size: 16px;
+  z-index: 100;
+  display: flex;
+}
+
+#header-bar > div {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.leftSection {
+  color: red;
+}
+
+.middleSection {
+  font-weight: bold;
+  font-size: 30px;
+}
+
+.rightSection {
+  align-items: flex-end;
+  justify-content: flex-start;
+  flex-direction: column;
+  font-size: 18px;
+  font-weight: bold;
+  line-height: 1;
+  text-align: right;
+  gap: 0;
+}
+
+.team-row {
+  display: flex;
+  margin: 0;
+  padding: 0;
+}
+
+.team-label {
+  display: inline-block;
+  width: 80px;
+  text-align: left;
+}
+
+.team-count {
+  display: inline-block;
+  width: 50px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Team colors are set via JS from teamColors array */
+
 /* ===========================================
    TOGGLE EFFECTS - Add these classes to the canvas
    in gameOfLife.html to try different looks
@@ -42,8 +113,12 @@ body {
 }
 
 @keyframes hue-cycle {
-  from { filter: hue-rotate(0deg); }
-  to { filter: hue-rotate(360deg); }
+  from {
+    filter: hue-rotate(0deg);
+  }
+  to {
+    filter: hue-rotate(360deg);
+  }
 }
 
 /* PULSE - subtle breathing animation */
@@ -52,8 +127,13 @@ body {
 }
 
 @keyframes pulse-anim {
-  0%, 100% { filter: brightness(1); }
-  50% { filter: brightness(1.3); }
+  0%,
+  100% {
+    filter: brightness(1);
+  }
+  50% {
+    filter: brightness(1.3);
+  }
 }
 
 /* VAPORWAVE - pink/cyan tint */
@@ -110,6 +190,11 @@ body {
 }
 
 @keyframes zoom-anim {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.02); }
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.02);
+  }
 }
