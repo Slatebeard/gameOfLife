@@ -15,6 +15,8 @@ const canvasContext = canvas.getContext('2d');
 // ================================
 
 const cellSize = 10;
+const frameRate = 10; // frames per second
+const frameInterval = 1000 / frameRate;
 
 
 // ================================
@@ -48,7 +50,7 @@ function drawGrid(grid) {
         for (let col = 0; col < grid[row].length; col++) {
 
             canvasContext.fillStyle =
-                grid[row][col] === 1 ? 'black' : 'white';
+                grid[row][col] === 1 ? 'red' : 'black';
 
             canvasContext.fillRect(
                 col * cellSize,
@@ -57,12 +59,6 @@ function drawGrid(grid) {
                 cellSize
             );
 
-            canvasContext.strokeRect(
-                col * cellSize,
-                row * cellSize,
-                cellSize,
-                cellSize
-            );
         }
     }
 }
@@ -112,10 +108,10 @@ function nextGeneration(currentGrid) {
 
         for (let col = 0; col < currentGrid[row].length; col++) {
 
-            // is alive
+
             const alive = currentGrid[row][col] === 1;
 
-            // Count how many neighbors are alive
+
             const neighbors = countNeighbors(row, col);
 
             if (alive) {
@@ -138,11 +134,17 @@ function nextGeneration(currentGrid) {
 }
 
 
-function step() {
+let lastFrameTime = 0;
+
+function step(currentTime) {
+    requestAnimationFrame(step);
+
+    if (currentTime - lastFrameTime < frameInterval) return;
+    lastFrameTime = currentTime;
+
     canvasContext.clearRect(0, 0, canvas.width, canvas.height);
     grid = nextGeneration(grid);
     drawGrid(grid);
-    requestAnimationFrame(step);
 }
 
 requestAnimationFrame(step);
