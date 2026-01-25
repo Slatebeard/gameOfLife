@@ -94,6 +94,30 @@ function updateScoreboard() {
         const el = document.getElementById(`count-${i}`);
         if (el) el.textContent = teamCounts[i];
     }
+
+    // Send scores to server for standings page
+    sendScoresToServer();
+}
+
+function sendScoresToServer() {
+    const teams = [];
+    for (let i = 1; i <= 4; i++) {
+        const nameEl = document.getElementById(`name-${i}`);
+        teams.push({
+            name: nameEl ? nameEl.textContent : `Team ${i}`,
+            color: teamColors[i],
+            count: teamCounts[i]
+        });
+    }
+
+    const eventEl = document.getElementById('event-text');
+    const event = eventEl ? eventEl.textContent : 'NO EVENT';
+
+    fetch('/api/scores', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ teams, event })
+    }).catch(() => {}); // Silently ignore errors
 }
 
 function updateClock() {

@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Game of Life - Standings</title>
+    <style>
+        @font-face {
+            font-family: "NerdFont";
+            src: url("fonts/3270NerdFont-Regular.ttf") format("truetype");
+        }
+
+        :root {
+            --main-font: "NerdFont", system-ui, -apple-system, sans-serif;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        html,
+        body {
+            font-family: var(--main-font);
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 100%);
+            min-height: 100vh;
+            color: #fff;
+        }
+
+        .container {
+            max-width: 500px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        header {
+            text-align: center;
+            padding: 20px 0 30px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            margin-bottom: 20px;
+        }
+
+        h1 {
+            font-size: 1.8rem;
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+
+        .subtitle {
+            font-size: 0.9rem;
+            opacity: 0.6;
+        }
+
+        .event-banner {
+            text-align: center;
+            padding: 12px;
+            margin-bottom: 20px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            font-size: 0.9rem;
+            opacity: 0.7;
+        }
+
+        .event-banner.active {
+            background: rgba(255, 0, 0, 0.15);
+            border-color: rgba(255, 0, 0, 0.4);
+            color: #ff6b6b;
+            opacity: 1;
+            animation: pulse 1s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        .standings {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .team-card {
+            display: flex;
+            align-items: center;
+            padding: 16px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            transition: transform 0.2s, background 0.2s;
+        }
+
+        .team-card.leader {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+
+        .rank {
+            font-size: 1.5rem;
+            font-weight: bold;
+            width: 40px;
+            text-align: center;
+            opacity: 0.5;
+        }
+
+        .team-card.leader .rank {
+            opacity: 1;
+        }
+
+        .color-dot {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            margin-right: 12px;
+            flex-shrink: 0;
+        }
+
+        .team-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .team-name {
+            font-size: 1.1rem;
+            font-weight: bold;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .team-count {
+            font-size: 1.4rem;
+            font-weight: bold;
+            font-variant-numeric: tabular-nums;
+            text-align: right;
+            min-width: 80px;
+        }
+
+        .last-updated {
+            text-align: center;
+            padding: 20px 0;
+            font-size: 0.8rem;
+            opacity: 0.4;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 60px 20px;
+            opacity: 0.5;
+        }
+
+        .total-cells {
+            text-align: center;
+            padding: 16px;
+            margin-top: 10px;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 8px;
+            font-size: 0.9rem;
+            opacity: 0.6;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <h1>Game of Life</h1>
+            <div class="subtitle">Live Standings</div>
+        </header>
+
+        <div id="event-banner" class="event-banner">NO EVENT</div>
+
+        <div id="standings" class="standings">
+            <div class="loading">Loading standings...</div>
+        </div>
+
+        <div id="total-cells" class="total-cells"></div>
+        <div id="last-updated" class="last-updated"></div>
+    </div>
+
+    <script>
+        async function fetchStandings() {
+            try {
+                const response = await fetch('/api/scores');
+                const data = await response.json();
+                renderStandings(data);
+            } catch (error) {
+                console.error('Failed to fetch standings:', error);
+            }
+        }
+
+        function renderStandings(data) {
+            const container = document.getElementById('standings');
+            const eventBanner = document.getElementById('event-banner');
+            const lastUpdated = document.getElementById('last-updated');
+            const totalCells = document.getElementById('total-cells');
+
+            // Update event banner
+            eventBanner.textContent = data.event || 'NO EVENT';
+            if (data.event && data.event !== 'NO EVENT') {
+                eventBanner.classList.add('active');
+            } else {
+                eventBanner.classList.remove('active');
+            }
+
+            // Sort teams by count (descending)
+            const sortedTeams = [...data.teams].sort((a, b) => b.count - a.count);
+            const maxCount = sortedTeams[0]?.count || 0;
+
+            // Calculate total
+            const total = data.teams.reduce((sum, t) => sum + t.count, 0);
+            totalCells.textContent = `Total cells: ${total.toLocaleString()}`;
+
+            // Render team cards
+            container.innerHTML = sortedTeams.map((team, index) => {
+                const isLeader = team.count === maxCount && maxCount > 0;
+                return `
+                    <div class="team-card ${isLeader ? 'leader' : ''}">
+                        <div class="rank">${index + 1}</div>
+                        <div class="color-dot" style="background-color: ${team.color}"></div>
+                        <div class="team-info">
+                            <div class="team-name">${escapeHtml(team.name)}</div>
+                        </div>
+                        <div class="team-count" style="color: ${team.color}">${team.count.toLocaleString()}</div>
+                    </div>
+                `;
+            }).join('');
+
+            // Update timestamp
+            if (data.lastUpdated) {
+                const date = new Date(data.lastUpdated);
+                lastUpdated.textContent = `Updated: ${date.toLocaleTimeString()}`;
+            }
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Initial fetch
+        fetchStandings();
+
+        // Refresh every 2 seconds
+        setInterval(fetchStandings, 2000);
+    </script>
+</body>
+
+</html>
