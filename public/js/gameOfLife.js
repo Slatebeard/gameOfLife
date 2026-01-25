@@ -50,6 +50,17 @@ const initialSpawnChance = 0.0005;
 let spawnChance = initialSpawnChance;
 const scoreboardInterval = 5;
 const showKeybinds = false;
+const fireworkLaunchInterval = 500;
+
+// debug toggles
+let debugShowTrails = true;
+let debugTrailsOnly = false;
+let debugShowMetrics = false;
+
+// performance metrics
+let fpsCounter = 0;
+let lastFpsUpdate = 0;
+let currentFps = 0;
 
 // game states
 const STATE_PRE_RUN = 'preRun';
@@ -173,6 +184,8 @@ function showGameoverPanel() {
         }
     }
 
+    resetFireworks();
+
     gameOverStartTime = Date.now();
     if (panel) panel.classList.add('visible');
 }
@@ -200,7 +213,7 @@ function updateGameoverCountdown() {
 }
 
 async function enterNightState() {
-    currentState = STATE_NIGHT;
+    resetFireworks();
     hideGameoverPanel();
     hidePregamePanel();
 
@@ -208,13 +221,15 @@ async function enterNightState() {
     const headerBar = document.getElementById('header-bar');
     if (headerBar) headerBar.style.display = 'none';
 
+    // Clear canvas and load palette before starting night state
+    canvasContext.clearRect(0, 0, canvas.width, canvas.height);
     await assignNightPalette();
 
+    currentState = STATE_NIGHT;
     console.log('Entering night mode');
 }
 
 function exitNightState() {
-    // Show header bar again
     const headerBar = document.getElementById('header-bar');
     if (headerBar) headerBar.style.display = 'flex';
 }
@@ -661,6 +676,13 @@ function drawGrid() {
         for (let col = 0; col < trailGrid[row].length; col++) {
             const { color, brightness } = trailGrid[row][col];
             if (brightness === 0) continue;
+
+            // Debug: trails only mode - skip live cells
+            if (debugTrailsOnly && brightness === 1) continue;
+
+            // Debug: no trails mode - skip fading cells
+            if (!debugShowTrails && brightness < 1) continue;
+
             const [r, g, b] = colorRGB[color];
             canvasContext.fillStyle = `rgba(${r * brightness}, ${g * brightness}, ${b * brightness}, ${brightness})`;
             canvasContext.fillRect(
@@ -684,6 +706,38 @@ function updateTrail() {
                 trailGrid[row][col].brightness = Math.max(0, trailGrid[row][col].brightness - trailFade);
             }
         }
+    }
+}
+
+function updateMetricsPanel(currentTime) {
+    fpsCounter++;
+    if (currentTime - lastFpsUpdate >= 1000) {
+        currentFps = fpsCounter;
+        fpsCounter = 0;
+        lastFpsUpdate = currentTime;
+    }
+
+    const panel = document.getElementById('debug-panel');
+    if (!panel) return;
+
+    if (debugShowMetrics) {
+        panel.classList.add('visible');
+
+        let liveCells = 0;
+        for (let i = 1; i <= 4; i++) {
+            liveCells += teamCounts[i];
+        }
+
+        document.getElementById('debug-fps').textContent = currentFps;
+        document.getElementById('debug-grid-size').textContent = `${cols} x ${rows}`;
+        document.getElementById('debug-cell-size').textContent = `${cellSize}px`;
+        document.getElementById('debug-total-cells').textContent = (cols * rows).toLocaleString();
+        document.getElementById('debug-live-cells').textContent = liveCells.toLocaleString();
+        document.getElementById('debug-state').textContent = currentState;
+        document.getElementById('debug-trails').textContent = debugShowTrails ? 'ON' : 'OFF';
+        document.getElementById('debug-trails-only').textContent = debugTrailsOnly ? 'ON' : 'OFF';
+    } else {
+        panel.classList.remove('visible');
     }
 }
 
@@ -717,6 +771,101 @@ function spawnExplosion() {
 
 function lowerSpawnChance() {
     spawnChance = Math.max(0, spawnChance - 0.0001);
+}
+
+
+// ================================
+// 5b. FIREWORKS
+// ================================
+
+let fireworks = [];
+let fireworkParticles = [];
+
+function launchFirework() {
+    const x = Math.random() * canvas.width;
+    const y = canvas.height;
+    const targetY = canvas.height * 0.2 + Math.random() * canvas.height * 0.4;
+    // Random color from today's palette
+    const color = teamColors[Math.floor(Math.random() * 4) + 1];
+
+    fireworks.push({
+        x: x,
+        y: y,
+        targetY: targetY,
+        speed: 8 + Math.random() * 4,
+        color: color
+    });
+}
+
+function explodeFirework(firework) {
+    const particleCount = 60 + Math.floor(Math.random() * 40);
+    for (let i = 0; i < particleCount; i++) {
+        const angle = (Math.PI * 2 / particleCount) * i + Math.random() * 0.2;
+        const speed = 2 + Math.random() * 4;
+        fireworkParticles.push({
+            x: firework.x,
+            y: firework.y,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed,
+            life: 1.0,
+            decay: 0.015 + Math.random() * 0.01,
+            color: firework.color,
+            size: 2 + Math.random() * 2
+        });
+    }
+}
+
+function updateFireworks() {
+    for (let i = fireworks.length - 1; i >= 0; i--) {
+        const fw = fireworks[i];
+        fw.y -= fw.speed;
+
+        if (fw.y <= fw.targetY) {
+            explodeFirework(fw);
+            fireworks.splice(i, 1);
+        }
+    }
+
+    for (let i = fireworkParticles.length - 1; i >= 0; i--) {
+        const p = fireworkParticles[i];
+        p.x += p.vx;
+        p.y += p.vy;
+        p.vy += 0.05; // gravity
+        p.vx *= 0.99; // drag
+        p.life -= p.decay;
+
+        if (p.life <= 0) {
+            fireworkParticles.splice(i, 1);
+        }
+    }
+}
+
+function drawFireworks() {
+    for (const fw of fireworks) {
+        canvasContext.beginPath();
+        canvasContext.arc(fw.x, fw.y, 3, 0, Math.PI * 2);
+        canvasContext.fillStyle = fw.color;
+        canvasContext.fill();
+
+        canvasContext.beginPath();
+        canvasContext.moveTo(fw.x, fw.y);
+        canvasContext.lineTo(fw.x, fw.y + 20);
+        canvasContext.strokeStyle = fw.color;
+        canvasContext.lineWidth = 2;
+        canvasContext.stroke();
+    }
+
+    for (const p of fireworkParticles) {
+        canvasContext.beginPath();
+        canvasContext.arc(p.x, p.y, p.size * p.life, 0, Math.PI * 2);
+        canvasContext.fillStyle = p.color + Math.floor(p.life * 255).toString(16).padStart(2, '0');
+        canvasContext.fill();
+    }
+}
+
+function resetFireworks() {
+    fireworks = [];
+    fireworkParticles = [];
 }
 
 
@@ -802,15 +951,34 @@ function nextGeneration() {
 
 let lastFrameTime = 0;
 let frameCount = 0;
+let lastFireworkLaunch = 0;
 
 function step(currentTime) {
     requestAnimationFrame(step);
 
+    // Clock and metrics always update regardless of state
+    updateClock();
+    updateMetricsPanel(currentTime);
+
+    // Game over runs at full 60fps for smooth fireworks
+    if (currentState === STATE_GAME_OVER) {
+        canvasContext.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Launch fireworks periodically (time-based, not frame-based)
+        if (currentTime - lastFireworkLaunch > fireworkLaunchInterval) {
+            launchFirework();
+            lastFireworkLaunch = currentTime;
+        }
+
+        updateFireworks();
+        drawFireworks();
+        updateGameoverCountdown();
+        return;
+    }
+
     if (currentTime - lastFrameTime < frameInterval) return;
     lastFrameTime = currentTime;
     frameCount++;
-
-    updateClock();
 
     if (currentEvent === EVENT_COMETS) {
         canvasContext.clearRect(0, 0, canvas.width, canvas.height);
@@ -826,11 +994,6 @@ function step(currentTime) {
 
     if (currentEvent === EVENT_DROUGHT) {
         lowerSpawnChance();
-    }
-
-    if (currentState === STATE_GAME_OVER) {
-        updateGameoverCountdown();
-        return;
     }
 
     if (currentState === STATE_PAUSED) {
@@ -955,6 +1118,21 @@ document.addEventListener('keydown', (e) => {
             break;
         case '0':
             enterNightState();
+            break;
+        // Debug toggles
+        case 't':
+        case 'T':
+            debugShowTrails = !debugShowTrails;
+            console.log(`Trails: ${debugShowTrails ? 'ON' : 'OFF'}`);
+            break;
+        case 'y':
+        case 'Y':
+            debugTrailsOnly = !debugTrailsOnly;
+            console.log(`Trails Only: ${debugTrailsOnly ? 'ON' : 'OFF'}`);
+            break;
+        case 'd':
+        case 'D':
+            debugShowMetrics = !debugShowMetrics;
             break;
     }
 });

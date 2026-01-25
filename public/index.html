@@ -97,6 +97,18 @@
         </div>
     </div>
 
+    <div id="debug-panel">
+        <div class="debug-title">Debug Metrics</div>
+        <div class="debug-row"><span class="debug-label">FPS</span><span id="debug-fps" class="debug-value">0</span></div>
+        <div class="debug-row"><span class="debug-label">Grid Size</span><span id="debug-grid-size" class="debug-value">0 x 0</span></div>
+        <div class="debug-row"><span class="debug-label">Cell Size</span><span id="debug-cell-size" class="debug-value">0px</span></div>
+        <div class="debug-row"><span class="debug-label">Total Cells</span><span id="debug-total-cells" class="debug-value">0</span></div>
+        <div class="debug-row"><span class="debug-label">Live Cells</span><span id="debug-live-cells" class="debug-value">0</span></div>
+        <div class="debug-row"><span class="debug-label">State</span><span id="debug-state" class="debug-value">-</span></div>
+        <div class="debug-row"><span class="debug-label">Trails</span><span id="debug-trails" class="debug-value">ON</span></div>
+        <div class="debug-row"><span class="debug-label">Trails Only</span><span id="debug-trails-only" class="debug-value">OFF</span></div>
+    </div>
+
     <div id="keybinds">
         <div class="keybind-title">Keybinds</div>
         <div><span class="key">1</span> Pre-Run</div>
@@ -107,6 +119,10 @@
         <div><span class="key">]</span> Advance Phase</div>
         <div><span class="key">0</span> Night Mode</div>
         <div><span class="key">H</span> Toggle Help</div>
+        <div style="margin-top: 10px; opacity: 0.5;">Debug</div>
+        <div><span class="key">T</span> Toggle Trails</div>
+        <div><span class="key">Y</span> Trails Only</div>
+        <div><span class="key">D</span> Debug Metrics</div>
     </div>
 
     <script src="js/gameOfLife.js"></script>

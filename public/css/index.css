@@ -353,6 +353,50 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+#debug-panel {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  padding: 15px 20px;
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 14px;
+  font-family: monospace;
+  z-index: 500;
+  display: none;
+  min-width: 200px;
+}
+
+#debug-panel.visible {
+  display: block;
+}
+
+.debug-title {
+  font-weight: bold;
+  margin-bottom: 10px;
+  font-size: 16px;
+  color: #00ff00;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  padding-bottom: 8px;
+}
+
+.debug-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.debug-label {
+  opacity: 0.7;
+}
+
+.debug-value {
+  font-weight: bold;
+  color: #00ff00;
+}
+
 #keybinds {
   position: fixed;
   bottom: 20px;
