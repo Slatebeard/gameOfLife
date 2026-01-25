@@ -1,0 +1,36 @@
+{
+    "lastWinner": {
+        "name": "Winter",
+        "color": "#c53a9d",
+        "date": "2026-01-25T18:17:47.222Z"
+    },
+    "mostPlayedPalette": {
+        "name": "EVA-03",
+        "count": 1
+    },
+    "mostPlayedCategory": {
+        "name": "Tech Companies",
+        "count": 1
+    },
+    "highestScore": {
+        "name": "Intel",
+        "color": "#334155",
+        "count": 1011,
+        "date": "2026-01-25T18:07:22.012Z"
+    },
+    "paletteCounts": {
+        "EVA-03": 1,
+        "Dead Forest": 1,
+        "EVA-02": 1,
+        "Fiery Plague": 1,
+        "Lava GB": 1
+    },
+    "categoryCounts": {
+        "Tech Companies": 1,
+        "Movie Characters": 1,
+        "Vegetables": 1,
+        "Game Franchises": 1,
+        "Seasons": 1
+    },
+    "gamesPlayed": 5
+}

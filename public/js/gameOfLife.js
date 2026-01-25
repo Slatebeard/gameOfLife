@@ -57,6 +57,23 @@ const STATE_RUNNING = 'running';
 const STATE_GAME_OVER = 'gameOver';
 const STATE_PAUSED = 'paused';
 
+// pregame phases
+const PHASE_PALETTE = 'palette';
+const PHASE_TEAMS = 'teams';
+const PHASE_STATS = 'stats';
+const PHASE_READY = 'ready';
+
+// phase timing config (minutes from pregame start)
+const phaseTimings = {
+    [PHASE_PALETTE]: 0,    // immediate
+    [PHASE_TEAMS]: 10,     // +10 min
+    [PHASE_STATS]: 20,     // +20 min
+    [PHASE_READY]: 25      // +25 min = game start
+};
+
+let currentPhase = PHASE_PALETTE;
+let pregameStartTime = null;
+
 
 // event states
 const EVENT_COMETS = 'comets';
@@ -83,6 +100,8 @@ let teamColors = [
 
 let currentPaletteName = '';
 let currentCategoryName = '';
+let actualTeamNames = ['', '', '', ''];
+let gameStats = null;
 
 function hexToRGB(hex) {
     // regex magic, no idea how it works, thanks gippity
@@ -126,8 +145,45 @@ function hidePregamePanel() {
     if (panel) panel.classList.remove('visible');
 }
 
+function showGameoverPanel() {
+    const panel = document.getElementById('gameover-panel');
+    const winnerEl = document.getElementById('gameover-winner');
+    const scoreEl = document.getElementById('gameover-score');
+
+    const winner = getWinner();
+
+    if (winnerEl) {
+        if (winner) {
+            winnerEl.textContent = winner.name;
+            winnerEl.style.color = winner.color;
+        } else {
+            winnerEl.textContent = 'No one';
+            winnerEl.style.color = '';
+        }
+    }
+
+    if (scoreEl) {
+        if (winner) {
+            scoreEl.textContent = `${winner.count.toLocaleString()} cells`;
+        } else {
+            scoreEl.textContent = '';
+        }
+    }
+
+    if (panel) panel.classList.add('visible');
+}
+
+function hideGameoverPanel() {
+    const panel = document.getElementById('gameover-panel');
+    if (panel) panel.classList.remove('visible');
+}
+
 function updatePregamePanel() {
     const paletteNameEl = document.getElementById('panel-palette-name');
+    const categoryNameEl = document.getElementById('panel-category-name');
+    const teamListEl = document.getElementById('panel-team-list');
+    const statsSection = document.querySelector('.panel-right');
+
     if (paletteNameEl) paletteNameEl.textContent = currentPaletteName;
 
     for (let i = 1; i <= 4; i++) {
@@ -137,16 +193,159 @@ function updatePregamePanel() {
         if (hexLabel) hexLabel.textContent = teamColors[i];
     }
 
-    const categoryNameEl = document.getElementById('panel-category-name');
-    if (categoryNameEl) categoryNameEl.textContent = currentCategoryName;
+    const teamsRevealed = currentPhase === PHASE_TEAMS || currentPhase === PHASE_STATS || currentPhase === PHASE_READY;
+
+    if (categoryNameEl) {
+        if (teamsRevealed) {
+            categoryNameEl.textContent = currentCategoryName;
+            categoryNameEl.classList.remove('panel-placeholder');
+        } else {
+            categoryNameEl.textContent = '???';
+            categoryNameEl.classList.add('panel-placeholder');
+        }
+    }
 
     for (let i = 1; i <= 4; i++) {
         const teamEl = document.getElementById(`panel-team-${i}`);
-        const nameEl = document.getElementById(`name-${i}`);
-        if (teamEl && nameEl) {
-            teamEl.textContent = nameEl.textContent;
-            teamEl.style.color = teamColors[i];
+        if (teamEl) {
+            if (teamsRevealed) {
+                teamEl.textContent = actualTeamNames[i - 1];
+                teamEl.style.color = teamColors[i];
+                teamEl.classList.remove('panel-placeholder');
+            } else {
+                teamEl.textContent = '???';
+                teamEl.style.color = 'rgba(255, 255, 255, 0.5)';
+                teamEl.classList.add('panel-placeholder');
+            }
         }
+    }
+
+    const statsRevealed = currentPhase === PHASE_STATS || currentPhase === PHASE_READY;
+    const lastWinnerEl = document.getElementById('stat-last-winner');
+    const mostPaletteEl = document.getElementById('stat-most-palette');
+    const mostCategoryEl = document.getElementById('stat-most-category');
+    const highestScoreEl = document.getElementById('stat-highest-score');
+
+    if (lastWinnerEl) {
+        if (statsRevealed && gameStats) {
+            lastWinnerEl.classList.remove('panel-placeholder');
+            if (gameStats.lastWinner?.name) {
+                lastWinnerEl.textContent = gameStats.lastWinner.name;
+                lastWinnerEl.style.color = gameStats.lastWinner.color;
+            } else {
+                lastWinnerEl.textContent = '-';
+                lastWinnerEl.style.color = '';
+            }
+        } else {
+            lastWinnerEl.textContent = '???';
+            lastWinnerEl.style.color = '';
+            lastWinnerEl.classList.add('panel-placeholder');
+        }
+    }
+
+    if (mostPaletteEl) {
+        if (statsRevealed && gameStats) {
+            mostPaletteEl.classList.remove('panel-placeholder');
+            mostPaletteEl.textContent = gameStats.mostPlayedPalette?.name || '-';
+        } else {
+            mostPaletteEl.textContent = '???';
+            mostPaletteEl.classList.add('panel-placeholder');
+        }
+    }
+
+    if (mostCategoryEl) {
+        if (statsRevealed && gameStats) {
+            mostCategoryEl.classList.remove('panel-placeholder');
+            mostCategoryEl.textContent = gameStats.mostPlayedCategory?.name || '-';
+        } else {
+            mostCategoryEl.textContent = '???';
+            mostCategoryEl.classList.add('panel-placeholder');
+        }
+    }
+
+    if (highestScoreEl) {
+        if (statsRevealed && gameStats) {
+            highestScoreEl.classList.remove('panel-placeholder');
+            if (gameStats.highestScore?.name) {
+                highestScoreEl.textContent = `${gameStats.highestScore.name} (${gameStats.highestScore.count.toLocaleString()})`;
+                highestScoreEl.style.color = gameStats.highestScore.color;
+            } else {
+                highestScoreEl.textContent = '-';
+                highestScoreEl.style.color = '';
+            }
+        } else {
+            highestScoreEl.textContent = '???';
+            highestScoreEl.style.color = '';
+            highestScoreEl.classList.add('panel-placeholder');
+        }
+    }
+
+    updateCountdown();
+}
+
+function getNextPhase() {
+    switch (currentPhase) {
+        case PHASE_PALETTE: return PHASE_TEAMS;
+        case PHASE_TEAMS: return PHASE_STATS;
+        case PHASE_STATS: return PHASE_READY;
+        default: return null;
+    }
+}
+
+function advancePhase() {
+    const nextPhase = getNextPhase();
+    if (nextPhase) {
+        currentPhase = nextPhase;
+        updateHeaderBarTeams();
+        updatePregamePanel();
+    }
+}
+
+function updateCountdown() {
+    const countdownEl = document.getElementById('pregame-countdown');
+    const countdownTimeEl = document.getElementById('countdown-time');
+    const countdownLabelEl = document.getElementById('countdown-label');
+
+    if (!countdownEl || !countdownTimeEl || !countdownLabelEl) return;
+
+    if (currentPhase === PHASE_READY) {
+        countdownLabelEl.textContent = 'Starting soon';
+        countdownTimeEl.textContent = '';
+        return;
+    }
+
+    const nextPhase = getNextPhase();
+    if (!nextPhase || !pregameStartTime) {
+        countdownEl.style.display = 'none';
+        return;
+    }
+
+    countdownEl.style.display = 'flex';
+
+    const nextPhaseTime = pregameStartTime + (phaseTimings[nextPhase] * 60 * 1000);
+    const now = Date.now();
+    const remainingMs = Math.max(0, nextPhaseTime - now);
+
+    const minutes = Math.floor(remainingMs / 60000);
+    const seconds = Math.floor((remainingMs % 60000) / 1000);
+    const timeStr = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+
+    switch (nextPhase) {
+        case PHASE_TEAMS:
+            countdownLabelEl.textContent = 'Teams reveal in';
+            break;
+        case PHASE_STATS:
+            countdownLabelEl.textContent = 'Stats reveal in';
+            break;
+        case PHASE_READY:
+            countdownLabelEl.textContent = 'Ready in';
+            break;
+    }
+
+    countdownTimeEl.textContent = timeStr;
+
+    if (remainingMs === 0) {
+        advancePhase();
     }
 }
 
@@ -195,9 +394,8 @@ function updateScoreboard() {
 function sendScoresToServer() {
     const teams = [];
     for (let i = 1; i <= 4; i++) {
-        const nameEl = document.getElementById(`name-${i}`);
         teams.push({
-            name: nameEl ? nameEl.textContent : `Team ${i}`,
+            name: actualTeamNames[i - 1] || `Team ${i}`,
             color: teamColors[i],
             count: teamCounts[i]
         });
@@ -211,6 +409,57 @@ function sendScoresToServer() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ teams, event })
     }).catch(() => { }); // ignore errors
+}
+
+async function fetchStats() {
+    try {
+        const response = await fetch('/api/stats');
+        gameStats = await response.json();
+        return gameStats;
+    } catch (error) {
+        console.error('Failed to fetch stats:', error);
+        return null;
+    }
+}
+
+function getWinner() {
+    let maxCount = 0;
+    let winnerIndex = -1;
+    for (let i = 1; i <= 4; i++) {
+        if (teamCounts[i] > maxCount) {
+            maxCount = teamCounts[i];
+            winnerIndex = i;
+        }
+    }
+    if (winnerIndex > 0) {
+        return {
+            name: actualTeamNames[winnerIndex - 1],
+            color: teamColors[winnerIndex],
+            count: maxCount
+        };
+    }
+    return null;
+}
+
+async function recordGameEnd() {
+    const winner = getWinner();
+    try {
+        const response = await fetch('/api/game-end', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                winner,
+                palette: currentPaletteName,
+                category: currentCategoryName
+            })
+        });
+        const result = await response.json();
+        if (result.stats) {
+            gameStats = result.stats;
+        }
+    } catch (error) {
+        console.error('Failed to record game end:', error);
+    }
 }
 
 function updateClock() {
@@ -247,15 +496,13 @@ async function assignRandomTeamNames() {
         const shuffled = [...names].sort(() => Math.random() - 0.5);
         const selectedNames = shuffled.slice(0, 4);
 
-        for (let i = 1; i <= 4; i++) {
-            const el = document.getElementById(`name-${i}`);
-            if (el) el.textContent = selectedNames[i - 1];
+        // Store actual names for later reveal
+        for (let i = 0; i < 4; i++) {
+            actualTeamNames[i] = selectedNames[i];
         }
 
-        const categoryLabel = document.getElementById('category-label');
-        if (categoryLabel) categoryLabel.textContent = randomCategory;
-
-        equalizeTeamLabelWidths();
+        // Update header bar display based on current phase
+        updateHeaderBarTeams();
 
         console.log(`Category: ${randomCategory}`);
     } catch (error) {
@@ -263,6 +510,33 @@ async function assignRandomTeamNames() {
     }
 }
 
+function updateHeaderBarTeams() {
+    const teamsRevealed = currentPhase === PHASE_TEAMS || currentPhase === PHASE_STATS || currentPhase === PHASE_READY;
+
+    for (let i = 1; i <= 4; i++) {
+        const el = document.getElementById(`name-${i}`);
+        if (el) {
+            if (teamsRevealed) {
+                el.textContent = actualTeamNames[i - 1];
+            } else {
+                el.textContent = '???';
+            }
+        }
+    }
+
+    const categoryLabel = document.getElementById('category-label');
+    if (categoryLabel) {
+        if (teamsRevealed) {
+            categoryLabel.textContent = currentCategoryName;
+        } else {
+            categoryLabel.textContent = '???';
+        }
+    }
+
+    equalizeTeamLabelWidths();
+}
+
+fetchStats();
 assignRandomPalette();
 assignRandomTeamNames();
 
@@ -499,6 +773,7 @@ function step(currentTime) {
 
     if (currentState === STATE_PRE_RUN) {
         canvasContext.clearRect(0, 0, canvas.width, canvas.height);
+        updateCountdown();
         drawGrid();
         return;
     }
@@ -530,6 +805,10 @@ if (showKeybinds && keybindsEl) {
 
 async function enterPregameState() {
     currentState = STATE_PRE_RUN;
+    currentPhase = PHASE_PALETTE;
+    pregameStartTime = Date.now();
+    hideGameoverPanel();
+    await fetchStats();
     await assignRandomPalette();
     await assignRandomTeamNames();
     resetGrid();
@@ -544,13 +823,19 @@ document.addEventListener('keydown', (e) => {
             break;
         case '2':
             currentState = STATE_RUNNING;
+            currentPhase = PHASE_READY; // Ensure teams are revealed when game starts
+            updateHeaderBarTeams();
             hidePregamePanel();
+            hideGameoverPanel();
             break;
         case '3':
             currentState = STATE_PAUSED;
             break;
         case '4':
             currentState = STATE_GAME_OVER;
+            updateScoreboard(); // Ensure final scores are counted
+            showGameoverPanel();
+            recordGameEnd();
             break;
         case '5':
             if (currentEvent === EVENT_COMETS) {
@@ -587,6 +872,11 @@ document.addEventListener('keydown', (e) => {
         case 'h':
         case 'H':
             if (keybindsEl) keybindsEl.classList.toggle('visible');
+            break;
+        case ']':
+            if (currentState === STATE_PRE_RUN) {
+                advancePhase();
+            }
             break;
     }
 });

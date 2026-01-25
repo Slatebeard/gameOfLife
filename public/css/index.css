@@ -90,7 +90,6 @@ body {
 #clock {
   font-size: calc(45px * var(--ui-scale));
   font-family: "NerdFont";
-  border-bottom: 1px solid rgba(255, 255, 255, 0.3);
 }
 
 #date {
@@ -247,6 +246,88 @@ body {
 .stat-value {
   font-size: calc(25px * var(--ui-scale));
   font-weight: bold;
+  -webkit-text-stroke: 1px rgba(255, 255, 255, 0.3);
+}
+
+.panel-placeholder {
+  opacity: 0.3;
+  font-style: italic;
+}
+
+.countdown {
+  position: absolute;
+  bottom: calc(15px * var(--ui-scale));
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(5px * var(--ui-scale));
+  padding: calc(10px * var(--ui-scale)) calc(20px * var(--ui-scale));
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: calc(8px * var(--ui-scale));
+}
+
+.countdown-label {
+  font-size: calc(16px * var(--ui-scale));
+  text-transform: uppercase;
+  letter-spacing: calc(1px * var(--ui-scale));
+  opacity: 0.7;
+}
+
+.countdown-time {
+  font-size: calc(36px * var(--ui-scale));
+  font-weight: bold;
+  font-variant-numeric: tabular-nums;
+}
+
+#gameover-panel {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  color: rgba(255, 255, 255, 0.9);
+  font-family: var(--main-font);
+  z-index: 300;
+  padding: calc(60px * var(--ui-scale)) calc(100px * var(--ui-scale));
+  text-align: center;
+  display: none;
+}
+
+#gameover-panel.visible {
+  display: block;
+}
+
+.gameover-label {
+  font-size: calc(32px * var(--ui-scale));
+  text-transform: uppercase;
+  letter-spacing: calc(3px * var(--ui-scale));
+  opacity: 0.7;
+  margin-bottom: calc(20px * var(--ui-scale));
+}
+
+.gameover-winner {
+  font-size: calc(72px * var(--ui-scale));
+  font-weight: bold;
+  margin-bottom: calc(15px * var(--ui-scale));
+  -webkit-text-stroke: 2px rgba(255, 255, 255, 0.3);
+}
+
+.gameover-score {
+  font-size: calc(36px * var(--ui-scale));
+  opacity: 0.8;
+  margin-bottom: calc(40px * var(--ui-scale));
+}
+
+.gameover-message {
+  font-size: calc(24px * var(--ui-scale));
+  opacity: 0.5;
+  font-style: italic;
 }
 
 #keybinds {

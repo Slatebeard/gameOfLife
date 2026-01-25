@@ -2,7 +2,36 @@ import { Hono } from 'hono'
 import { serveStatic } from '@hono/node-server/serve-static'
 import { serve } from '@hono/node-server'
 import { getConnInfo } from '@hono/node-server/conninfo'
-import { readFileSync } from 'fs'
+import { readFileSync, writeFileSync, existsSync } from 'fs'
+
+const STATS_FILE = './data/stats.json'
+
+function loadStats() {
+    try {
+        if (existsSync(STATS_FILE)) {
+            return JSON.parse(readFileSync(STATS_FILE, 'utf-8'))
+        }
+    } catch (error) {
+        console.error('Failed to load stats:', error)
+    }
+    return {
+        lastWinner: { name: null, color: null, date: null },
+        mostPlayedPalette: { name: null, count: 0 },
+        mostPlayedCategory: { name: null, count: 0 },
+        highestScore: { name: null, color: null, count: 0, date: null },
+        paletteCounts: {},
+        categoryCounts: {},
+        gamesPlayed: 0
+    }
+}
+
+function saveStats(stats) {
+    try {
+        writeFileSync(STATS_FILE, JSON.stringify(stats, null, 4))
+    } catch (error) {
+        console.error('Failed to save stats:', error)
+    }
+}
 
 const app = new Hono()
 
@@ -34,6 +63,75 @@ app.post('/api/scores', async (c) => {
 
 app.get('/api/scores', (c) => {
     return c.json(currentScores)
+})
+
+app.get('/api/stats', (c) => {
+    const stats = loadStats()
+    return c.json(stats)
+})
+
+app.post('/api/game-end', async (c) => {
+    const body = await c.req.json()
+    const { winner, palette, category } = body
+
+    const stats = loadStats()
+
+    // Update games played
+    stats.gamesPlayed++
+
+    // Update last winner
+    if (winner) {
+        stats.lastWinner = {
+            name: winner.name,
+            color: winner.color,
+            date: new Date().toISOString()
+        }
+
+        // Check if this is the highest score ever
+        if (winner.count > stats.highestScore.count) {
+            stats.highestScore = {
+                name: winner.name,
+                color: winner.color,
+                count: winner.count,
+                date: new Date().toISOString()
+            }
+        }
+    }
+
+    // Update palette counts
+    if (palette) {
+        stats.paletteCounts[palette] = (stats.paletteCounts[palette] || 0) + 1
+
+        // Recalculate most played palette
+        let maxPalette = null
+        let maxPaletteCount = 0
+        for (const [name, count] of Object.entries(stats.paletteCounts)) {
+            if (count > maxPaletteCount) {
+                maxPaletteCount = count
+                maxPalette = name
+            }
+        }
+        stats.mostPlayedPalette = { name: maxPalette, count: maxPaletteCount }
+    }
+
+    // Update category counts
+    if (category) {
+        stats.categoryCounts[category] = (stats.categoryCounts[category] || 0) + 1
+
+        // Recalculate most played category
+        let maxCategory = null
+        let maxCategoryCount = 0
+        for (const [name, count] of Object.entries(stats.categoryCounts)) {
+            if (count > maxCategoryCount) {
+                maxCategoryCount = count
+                maxCategory = name
+            }
+        }
+        stats.mostPlayedCategory = { name: maxCategory, count: maxCategoryCount }
+    }
+
+    saveStats(stats)
+    return c.json({ success: true, stats })
 })
 
 app.get('/score', (c) => {
