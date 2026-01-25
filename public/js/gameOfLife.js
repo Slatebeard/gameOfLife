@@ -69,7 +69,7 @@ const cometMaxRadius = 12;
 
 const cometSpawnInterval = Math.floor(Math.random() * 12) + 2; // spawn every 2-10 frames
 
-let currentState = STATE_RUNNING;
+let currentState = STATE_PRE_RUN;
 let currentEvent = null;
 
 // index 0 is dead (transparent), indices 1-4 are team colors
@@ -114,6 +114,38 @@ function equalizeTeamLabelWidths() {
     labels.forEach(el => {
         el.style.width = `${maxWidth}px`;
     });
+}
+
+function showPregamePanel() {
+    const panel = document.getElementById('pregame-panel');
+    if (panel) panel.classList.add('visible');
+}
+
+function hidePregamePanel() {
+    const panel = document.getElementById('pregame-panel');
+    if (panel) panel.classList.remove('visible');
+}
+
+function updatePregamePanel() {
+    const paletteNameEl = document.getElementById('panel-palette-name');
+    if (paletteNameEl) paletteNameEl.textContent = currentPaletteName;
+
+    for (let i = 1; i <= 4; i++) {
+        const swatch = document.getElementById(`swatch-${i}`);
+        if (swatch) swatch.style.backgroundColor = teamColors[i];
+    }
+
+    const categoryNameEl = document.getElementById('panel-category-name');
+    if (categoryNameEl) categoryNameEl.textContent = currentCategoryName;
+
+    for (let i = 1; i <= 4; i++) {
+        const teamEl = document.getElementById(`panel-team-${i}`);
+        const nameEl = document.getElementById(`name-${i}`);
+        if (teamEl && nameEl) {
+            teamEl.textContent = nameEl.textContent;
+            teamEl.style.color = teamColors[i];
+        }
+    }
 }
 
 async function assignRandomPalette() {
@@ -494,16 +526,23 @@ if (showKeybinds && keybindsEl) {
     keybindsEl.classList.add('visible');
 }
 
+async function enterPregameState() {
+    currentState = STATE_PRE_RUN;
+    await assignRandomPalette();
+    await assignRandomTeamNames();
+    resetGrid();
+    updatePregamePanel();
+    showPregamePanel();
+}
+
 document.addEventListener('keydown', (e) => {
     switch (e.key) {
         case '1':
-            currentState = STATE_PRE_RUN;
-            assignRandomPalette();
-            assignRandomTeamNames();
-            resetGrid();
+            enterPregameState();
             break;
         case '2':
             currentState = STATE_RUNNING;
+            hidePregamePanel();
             break;
         case '3':
             currentState = STATE_PAUSED;

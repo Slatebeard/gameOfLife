@@ -67,7 +67,7 @@ body {
 
 #event-text.event-active {
   display: inline-block;
-  animation: event-pulse 0.5s ease-in-out infinite;
+  animation: pulse-anim 0.5s ease-in-out infinite;
 }
 
 @keyframes event-shake {
@@ -110,10 +110,11 @@ body {
 #clock {
   font-size: calc(45px * var(--ui-scale));
   font-family: "NerdFont";
+  border-bottom: 1px solid rgba(255, 255, 255, 0.3);
 }
 
 #date {
-  font-size: calc(16px * var(--ui-scale));
+  font-size: calc(20px * var(--ui-scale));
   opacity: 0.7;
 }
 
@@ -162,9 +163,95 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-/* Team colors are set via JS from teamColors array */
+#pregame-panel {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(0, 0, 0, 0.668);
+  backdrop-filter: blur(15px);
+  -webkit-backdrop-filter: blur(15px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: rgba(255, 255, 255, 0.9);
+  font-family: var(--main-font);
+  z-index: 200;
+  display: none;
+}
 
-/* Keybinds help panel */
+#pregame-panel.visible {
+  display: flex;
+}
+
+.panel-section {
+  padding: calc(20px * var(--ui-scale));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: calc(500px * var(--ui-scale));
+  min-height: calc(300px * var(--ui-scale));
+}
+
+.panel-section:not(:last-child) {
+  border-right: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.panel-title {
+  font-size: calc(30px * var(--ui-scale));
+  text-transform: uppercase;
+  letter-spacing: calc(2px * var(--ui-scale));
+  opacity: 0.5;
+  margin-bottom: calc(10px * var(--ui-scale));
+  border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.panel-value {
+  font-size: calc(28px * var(--ui-scale));
+  font-weight: bold;
+  margin-bottom: calc(15px * var(--ui-scale));
+}
+
+.palette-preview {
+  display: flex;
+  gap: calc(40px * var(--ui-scale));
+}
+
+.color-swatch {
+  width: calc(60px * var(--ui-scale));
+  height: calc(50px * var(--ui-scale));
+  border-radius: calc(4px * var(--ui-scale));
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.team-list {
+  display: flex;
+  flex-direction: column;
+  gap: calc(4px * var(--ui-scale));
+  align-items: center;
+}
+
+.panel-team {
+  font-size: calc(25px * var(--ui-scale));
+  font-weight: bold;
+}
+
+.stat-row {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  gap: calc(20px * var(--ui-scale));
+  margin-bottom: calc(8px * var(--ui-scale));
+}
+
+.stat-label {
+  font-size: calc(25px * var(--ui-scale));
+  opacity: 0.6;
+}
+
+.stat-value {
+  font-size: calc(25px * var(--ui-scale));
+  font-weight: bold;
+}
+
 #keybinds {
   position: fixed;
   bottom: 20px;

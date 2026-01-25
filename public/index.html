@@ -28,6 +28,39 @@
     </div>
     <canvas id="liveCanvas"></canvas>
 
+    <div id="pregame-panel">
+        <div class="panel-section panel-left">
+            <div class="panel-title">Today's Palette</div>
+            <div id="panel-palette-name" class="panel-value"></div>
+            <div id="panel-palette-preview" class="palette-preview">
+                <span class="color-swatch" id="swatch-1"></span>
+                <span class="color-swatch" id="swatch-2"></span>
+                <span class="color-swatch" id="swatch-3"></span>
+                <span class="color-swatch" id="swatch-4"></span>
+            </div>
+        </div>
+        <div class="panel-section panel-middle">
+            <div class="panel-title">Today's Teams</div>
+            <div id="panel-category-name" class="panel-value"></div>
+            <div id="panel-team-list" class="team-list">
+                <div class="panel-team" id="panel-team-1"></div>
+                <div class="panel-team" id="panel-team-2"></div>
+                <div class="panel-team" id="panel-team-3"></div>
+                <div class="panel-team" id="panel-team-4"></div>
+            </div>
+        </div>
+        <div class="panel-section panel-right">
+            <div class="panel-title">Stats</div>
+            <div class="stat-row">
+                <span class="stat-label">Previous Winner</span>
+                <span id="stat-prev-winner" class="stat-value">-</span>
+            </div>
+            <div class="stat-row">
+                <span class="stat-label">Games Played</span>
+                <span id="stat-games-played" class="stat-value">0</span>
+            </div>
+        </div>
+    </div>
 
     <div id="keybinds">
         <div class="keybind-title">Keybinds</div>
