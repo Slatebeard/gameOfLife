@@ -159,7 +159,7 @@ function hidePregamePanel() {
     if (panel) panel.classList.remove('visible');
 }
 
-function showGameoverPanel() {
+async function showGameoverPanel() {
     const panel = document.getElementById('gameover-panel');
     const winnerEl = document.getElementById('gameover-winner');
     const scoreEl = document.getElementById('gameover-score');
@@ -184,7 +184,8 @@ function showGameoverPanel() {
         }
     }
 
-    resetFireworks();
+    // Switch to night palette for background
+    await assignNightPalette();
 
     gameOverStartTime = Date.now();
     if (panel) panel.classList.add('visible');
@@ -616,11 +617,6 @@ function updateHeaderBarTeams() {
     equalizeTeamLabelWidths();
 }
 
-fetchStats();
-assignRandomPalette();
-assignRandomTeamNames();
-
-
 // ================================
 // 3. INIT STATE
 // ================================
@@ -960,18 +956,18 @@ function step(currentTime) {
     updateClock();
     updateMetricsPanel(currentTime);
 
-    // Game over runs at full 60fps for smooth fireworks
+    // Game over shows night mode simulation behind the winner panel
     if (currentState === STATE_GAME_OVER) {
-        canvasContext.clearRect(0, 0, canvas.width, canvas.height);
-
-        // Launch fireworks periodically (time-based, not frame-based)
-        if (currentTime - lastFireworkLaunch > fireworkLaunchInterval) {
-            launchFirework();
-            lastFireworkLaunch = currentTime;
+        if (currentTime - lastFrameTime < frameInterval) {
+            updateGameoverCountdown();
+            return;
         }
+        lastFrameTime = currentTime;
 
-        updateFireworks();
-        drawFireworks();
+        canvasContext.clearRect(0, 0, canvas.width, canvas.height);
+        nextGeneration();
+        updateTrail();
+        drawGrid();
         updateGameoverCountdown();
         return;
     }
@@ -1072,8 +1068,7 @@ document.addEventListener('keydown', (e) => {
         case '4':
             currentState = STATE_GAME_OVER;
             updateScoreboard(); // Ensure final scores are counted
-            showGameoverPanel();
-            recordGameEnd();
+            showGameoverPanel().then(() => recordGameEnd());
             break;
         case '5':
             if (currentEvent === EVENT_COMETS) {
@@ -1136,3 +1131,6 @@ document.addEventListener('keydown', (e) => {
             break;
     }
 });
+
+// Initialize in pregame state with reveal panel
+enterPregameState();

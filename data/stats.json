@@ -1,8 +1,8 @@
 {
     "lastWinner": {
-        "name": "PlayStation",
-        "color": "#312b24",
-        "date": "2026-01-25T19:00:51.972Z"
+        "name": "Circle K",
+        "color": "#151540",
+        "date": "2026-01-25T21:36:17.321Z"
     },
     "mostPlayedPalette": {
         "name": "Dead Forest",
@@ -10,7 +10,7 @@
     },
     "mostPlayedCategory": {
         "name": "Movie Characters",
-        "count": 3
+        "count": 4
     },
     "highestScore": {
         "name": "Legolas",
@@ -22,7 +22,7 @@
         "EVA-03": 1,
         "Dead Forest": 2,
         "EVA-02": 1,
-        "Fiery Plague": 1,
+        "Fiery Plague": 2,
         "Lava GB": 1,
         "Velvet Cherry GB": 1,
         "Red Pain": 1,
@@ -34,20 +34,21 @@
         "EVA-01": 1,
         "Look Of Horror": 1,
         "Obsidian Rose": 1,
-        "Hound Root": 1
+        "Hound Root": 1,
+        "Midnight Blue": 1
     },
     "categoryCounts": {
         "Tech Companies": 1,
-        "Movie Characters": 3,
+        "Movie Characters": 4,
         "Vegetables": 2,
         "Game Franchises": 2,
         "Seasons": 1,
         "Car Manufacturers": 1,
         "Old Fashion Trends": 3,
         "Animals": 1,
-        "Convinience Store Chains": 1,
+        "Convinience Store Chains": 2,
         "Coding Languages": 1,
         "Video Game Consoles": 1
     },
-    "gamesPlayed": 17
+    "gamesPlayed": 19
 }
