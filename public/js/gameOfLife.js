@@ -59,13 +59,17 @@ const cometSpawnInterval = Math.floor(Math.random() * 12) + 2; // spawn every 2-
 let currentState = STATE_RUNNING;
 let currentEvent = null;
 
-const teamColors = [
-    '#000000', // dead dont touch, fully transparent
+// index 0 is dead (transparent), indices 1-4 are team colors
+let teamColors = [
+    '#000000', // dead, dont touch
     '#E63946',
     '#457B9D',
     '#2A9D8F',
     '#F4A261'
 ];
+
+let currentPaletteName = '';
+let currentCategoryName = '';
 
 function hexToRGB(hex) {
     // regex magic, no idea how it works, thanks gippity
@@ -78,7 +82,50 @@ function hexToRGB(hex) {
     ] : [0, 0, 0];
 }
 
-const colorRGB = teamColors.map(hexToRGB);
+let colorRGB = teamColors.map(hexToRGB);
+
+function updateColorRGB() {
+    colorRGB = teamColors.map(hexToRGB);
+}
+
+function equalizeTeamLabelWidths() {
+    const labels = [];
+    for (let i = 1; i <= 4; i++) {
+        const el = document.getElementById(`name-${i}`);
+        if (el) {
+            el.style.width = 'auto';
+            labels.push(el);
+        }
+    }
+    const maxWidth = Math.max(...labels.map(el => el.offsetWidth));
+    labels.forEach(el => {
+        el.style.width = `${maxWidth}px`;
+    });
+}
+
+async function assignRandomPalette() {
+    try {
+        const response = await fetch('/data/palettes.json');
+        const data = await response.json();
+
+        const paletteNames = Object.keys(data.palettes);
+        const randomName = paletteNames[Math.floor(Math.random() * paletteNames.length)];
+        const colors = data.palettes[randomName];
+
+        currentPaletteName = randomName;
+
+        for (let i = 0; i < 4; i++) {
+            teamColors[i + 1] = colors[i];
+        }
+
+        updateColorRGB();
+        initTeamColors();
+
+        console.log(`Palette: ${randomName}`);
+    } catch (error) {
+        console.error('Failed to load palette:', error);
+    }
+}
 
 const teamCounts = [0, 0, 0, 0, 0];
 
@@ -95,7 +142,6 @@ function updateScoreboard() {
         if (el) el.textContent = teamCounts[i];
     }
 
-    // Send scores to server for standings page
     sendScoresToServer();
 }
 
@@ -117,7 +163,7 @@ function sendScoresToServer() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ teams, event })
-    }).catch(() => {}); // Silently ignore errors
+    }).catch(() => { }); // ignore errors
 }
 
 function updateClock() {
@@ -149,6 +195,8 @@ async function assignRandomTeamNames() {
         const randomCategory = categoryKeys[Math.floor(Math.random() * categoryKeys.length)];
         const names = data.categories[randomCategory];
 
+        currentCategoryName = randomCategory;
+
         const shuffled = [...names].sort(() => Math.random() - 0.5);
         const selectedNames = shuffled.slice(0, 4);
 
@@ -156,11 +204,19 @@ async function assignRandomTeamNames() {
             const el = document.getElementById(`name-${i}`);
             if (el) el.textContent = selectedNames[i - 1];
         }
+
+        const categoryLabel = document.getElementById('category-label');
+        if (categoryLabel) categoryLabel.textContent = randomCategory;
+
+        equalizeTeamLabelWidths();
+
+        console.log(`Category: ${randomCategory}`);
     } catch (error) {
         console.error('Failed to load team names:', error);
     }
 }
 
+assignRandomPalette();
 assignRandomTeamNames();
 
 
@@ -171,37 +227,42 @@ assignRandomTeamNames();
 const rows = Math.floor(canvas.height / cellSize);
 const cols = Math.floor(canvas.width / cellSize);
 
-// Double buffer to avoid allocations each frame
 let grid = [];
 let gridBuffer = [];
+let trailGrid = [];
 
-for (let r = 0; r < rows; r++) {
-    const row = [];
-    const bufferRow = [];
-    for (let c = 0; c < cols; c++) {
-        if (Math.random() < 0.5) {
-            row.push(0); // dead
-            bufferRow.push(0);
-        } else {
-            // random color, like rain
-            const color = Math.floor(Math.random() * 4) + 1;
-            row.push(color);
+function resetGrid() {
+    grid = [];
+    gridBuffer = [];
+    trailGrid = [];
+
+    for (let r = 0; r < rows; r++) {
+        const row = [];
+        const bufferRow = [];
+        const trailRow = [];
+        for (let c = 0; c < cols; c++) {
+            if (Math.random() < 0.5) {
+                row.push(0); // dead
+                trailRow.push({ color: 0, brightness: 0 });
+            } else {
+                // random color, like rain
+                const color = Math.floor(Math.random() * 4) + 1;
+                row.push(color);
+                trailRow.push({ color: color, brightness: 1 });
+            }
             bufferRow.push(0);
         }
+        grid.push(row);
+        gridBuffer.push(bufferRow);
+        trailGrid.push(trailRow);
     }
-    grid.push(row);
-    gridBuffer.push(bufferRow);
+
+    canvasContext.clearRect(0, 0, canvas.width, canvas.height);
+    updateScoreboard();
+    drawGrid();
 }
 
-let trailGrid = [];
-for (let r = 0; r < rows; r++) {
-    const row = [];
-    for (let c = 0; c < cols; c++) {
-        const color = grid[r][c];
-        row.push({ color: color, brightness: color > 0 ? 1 : 0 });
-    }
-    trailGrid.push(row);
-}
+resetGrid();
 
 updateScoreboard();
 
@@ -277,7 +338,6 @@ function lowerSpawnChance() {
 // 6. ITERATE NEXT GEN
 // ================================
 
-// Pre-allocated arrays to avoid GC pressure
 const colorCounts = [0, 0, 0, 0, 0];
 const dominantColors = [0, 0, 0, 0];
 const neighborResult = { count: 0, dominantColor: 0 };
@@ -425,6 +485,9 @@ document.addEventListener('keydown', (e) => {
     switch (e.key) {
         case '1':
             currentState = STATE_PRE_RUN;
+            assignRandomPalette();
+            assignRandomTeamNames();
+            resetGrid();
             break;
         case '2':
             currentState = STATE_RUNNING;

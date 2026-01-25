@@ -47,27 +47,31 @@
       "Kangaroo",
       "Wallaby",
       "Emu",
-      "Dingo"
+      "Dingo",
+      "Dog",
+      "Cat",
+      "Rabbit",
+      "Hamster",
+      "Guinea Pig",
+      "Parrot",
+      "Canary",
+      "Tortoise",
+      "Turtle",
+      "Frog",
+      "Toad",
+      "Salamander",
+      "Karp",
+      "Goldfish"
     ],
-    "Mythology": [
+    "Mythological Creatures": [
       "Titan",
       "Phoenix",
       "Dragon",
       "Valkyrie",
       "Hydra",
-      "Griffins",
+      "Griffin",
       "Kraken",
-      "Sphinxe"
-    ],
-    "Actors": [
-      "Stallone",
-      "Schwarzenegger",
-      "DeNiro",
-      "Pacino",
-      "Hanks",
-      "Clooney",
-      "DiCaprio",
-      "Neeson"
+      "Sphinx"
     ],
     "Video Game Characters": [
       "Mario",
