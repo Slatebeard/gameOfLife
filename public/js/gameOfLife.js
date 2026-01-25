@@ -29,14 +29,27 @@ const canvasContext = canvas.getContext('2d');
 // 2. CONFIG
 // ================================
 
-const cellSize = 8;
+const TARGET_WIDTH = 1920;
+const TARGET_HEIGHT = 1080;
+
+const scaleX = window.innerWidth / TARGET_WIDTH;
+const scaleY = window.innerHeight / TARGET_HEIGHT;
+const scaleFactor = Math.min(scaleX, scaleY);
+const baseCellSize = 8;
+const baseFontScale = 1;
+
+const cellSize = Math.round(baseCellSize * scaleFactor);
+const fontScale = scaleFactor;
+
+document.documentElement.style.setProperty('--ui-scale', fontScale);
+
 const frameRate = 14;
 const frameInterval = 1000 / frameRate;
 const trailFade = 0.005; // closer to 1 = faster fade
 const initialSpawnChance = 0.0005;
 let spawnChance = initialSpawnChance;
 const scoreboardInterval = 5;
-const showKeybinds = false; // toggle keybinds panel visibility
+const showKeybinds = false;
 
 // game states
 const STATE_PRE_RUN = 'preRun';

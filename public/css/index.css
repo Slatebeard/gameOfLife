@@ -5,6 +5,7 @@
 
 :root {
   --main-font: "NerdFont", system-ui, -apple-system, sans-serif;
+  --ui-scale: 1; /* Set by JS based on screen resolution */
 }
 
 html,
@@ -38,7 +39,7 @@ body {
   top: -1;
   left: 50%;
   transform: translateX(-50%);
-  padding: 12px 0px;
+  padding: calc(12px * var(--ui-scale)) 0px;
   background: rgba(0, 0, 0, 0.668);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
@@ -46,7 +47,7 @@ body {
   border-top: none;
   color: rgba(255, 255, 255, 0.9);
   font-family: var(--main-font);
-  font-size: 16px;
+  font-size: calc(16px * var(--ui-scale));
   z-index: 100;
   display: flex;
 }
@@ -60,7 +61,7 @@ body {
 
 .leftSection {
   color: red;
-  font-size: 40px;
+  font-size: calc(40px * var(--ui-scale));
   border-right: 1px solid rgba(255, 255, 255, 0.3);
 }
 
@@ -107,12 +108,12 @@ body {
 }
 
 #clock {
-  font-size: 45px;
+  font-size: calc(45px * var(--ui-scale));
   font-family: "NerdFont";
 }
 
 #date {
-  font-size: 16px;
+  font-size: calc(16px * var(--ui-scale));
   opacity: 0.7;
 }
 
@@ -120,7 +121,7 @@ body {
   align-items: flex-start;
   justify-content: flex-start;
   flex-direction: column;
-  font-size: 20px;
+  font-size: calc(20px * var(--ui-scale));
   font-weight: bold;
   line-height: 1;
   text-align: left;
@@ -132,12 +133,12 @@ body {
 .category-label {
   width: 100%;
   text-align: center;
-  font-size: 18px;
+  font-size: calc(18px * var(--ui-scale));
   font-weight: bold;
   opacity: 0.5;
-  margin-bottom: 4px;
+  margin-bottom: calc(4px * var(--ui-scale));
   text-transform: uppercase;
-  letter-spacing: 1px;
+  letter-spacing: calc(1px * var(--ui-scale));
   border-bottom: 1px solid rgba(255, 255, 255, 0.3);
 }
 
@@ -149,14 +150,14 @@ body {
 
 .team-label {
   display: inline-block;
-  min-width: 100px;
+  min-width: calc(100px * var(--ui-scale));
   text-align: left;
   white-space: nowrap;
 }
 
 .team-count {
   display: inline-block;
-  width: 80px;
+  width: calc(80px * var(--ui-scale));
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
