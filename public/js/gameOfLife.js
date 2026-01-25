@@ -132,7 +132,9 @@ function updatePregamePanel() {
 
     for (let i = 1; i <= 4; i++) {
         const swatch = document.getElementById(`swatch-${i}`);
+        const hexLabel = document.getElementById(`hex-${i}`);
         if (swatch) swatch.style.backgroundColor = teamColors[i];
+        if (hexLabel) hexLabel.textContent = teamColors[i];
     }
 
     const categoryNameEl = document.getElementById('panel-category-name');

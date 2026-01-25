@@ -67,27 +67,7 @@ body {
 
 #event-text.event-active {
   display: inline-block;
-  animation: pulse-anim 0.5s ease-in-out infinite;
-}
-
-@keyframes event-shake {
-  0%,
-  100% {
-    transform: translateX(0);
-  }
-  10%,
-  30%,
-  50%,
-  70%,
-  90% {
-    transform: translateX(-3px);
-  }
-  20%,
-  40%,
-  60%,
-  80% {
-    transform: translateX(3px);
-  }
+  animation: event-pulse 0.5s ease-in-out infinite;
 }
 
 @keyframes event-pulse {
@@ -154,6 +134,7 @@ body {
   min-width: calc(100px * var(--ui-scale));
   text-align: left;
   white-space: nowrap;
+  -webkit-text-stroke: 1px rgba(255, 255, 255, 0.3);
 }
 
 .team-count {
@@ -161,6 +142,7 @@ body {
   width: calc(80px * var(--ui-scale));
   text-align: right;
   font-variant-numeric: tabular-nums;
+  -webkit-text-stroke: 1px rgba(255, 255, 255, 0.3);
 }
 
 #pregame-panel {
@@ -215,11 +197,25 @@ body {
   gap: calc(40px * var(--ui-scale));
 }
 
+.swatch-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(8px * var(--ui-scale));
+}
+
 .color-swatch {
   width: calc(60px * var(--ui-scale));
   height: calc(50px * var(--ui-scale));
   border-radius: calc(4px * var(--ui-scale));
   border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.hex-label {
+  font-size: calc(14px * var(--ui-scale));
+  font-family: var(--main-font);
+  opacity: 0.7;
+  text-transform: uppercase;
 }
 
 .team-list {
@@ -232,6 +228,7 @@ body {
 .panel-team {
   font-size: calc(25px * var(--ui-scale));
   font-weight: bold;
+  -webkit-text-stroke: 1px rgba(255, 255, 255, 0.3);
 }
 
 .stat-row {
