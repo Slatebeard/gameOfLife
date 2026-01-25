@@ -1,36 +1,39 @@
 {
     "lastWinner": {
-        "name": "Winter",
-        "color": "#c53a9d",
-        "date": "2026-01-25T18:17:47.222Z"
+        "name": "Volkswagen",
+        "color": "#5e4069",
+        "date": "2026-01-25T18:25:13.796Z"
     },
     "mostPlayedPalette": {
         "name": "EVA-03",
         "count": 1
     },
     "mostPlayedCategory": {
-        "name": "Tech Companies",
-        "count": 1
+        "name": "Movie Characters",
+        "count": 2
     },
     "highestScore": {
-        "name": "Intel",
-        "color": "#334155",
-        "count": 1011,
-        "date": "2026-01-25T18:07:22.012Z"
+        "name": "Legolas",
+        "color": "#2d162c",
+        "count": 1555,
+        "date": "2026-01-25T18:24:23.761Z"
     },
     "paletteCounts": {
         "EVA-03": 1,
         "Dead Forest": 1,
         "EVA-02": 1,
         "Fiery Plague": 1,
-        "Lava GB": 1
+        "Lava GB": 1,
+        "Velvet Cherry GB": 1,
+        "Red Pain": 1
     },
     "categoryCounts": {
         "Tech Companies": 1,
-        "Movie Characters": 1,
+        "Movie Characters": 2,
         "Vegetables": 1,
         "Game Franchises": 1,
-        "Seasons": 1
+        "Seasons": 1,
+        "Car Manufacturers": 1
     },
-    "gamesPlayed": 5
+    "gamesPlayed": 7
 }

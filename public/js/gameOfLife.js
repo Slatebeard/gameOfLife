@@ -56,6 +56,7 @@ const STATE_PRE_RUN = 'preRun';
 const STATE_RUNNING = 'running';
 const STATE_GAME_OVER = 'gameOver';
 const STATE_PAUSED = 'paused';
+const STATE_NIGHT = 'night';
 
 // pregame phases
 const PHASE_PALETTE = 'palette';
@@ -73,6 +74,8 @@ const phaseTimings = {
 
 let currentPhase = PHASE_PALETTE;
 let pregameStartTime = null;
+let gameOverStartTime = null;
+const NIGHT_MODE_DELAY = 10 * 60 * 1000; // 10 minutes in ms
 
 
 // event states
@@ -170,12 +173,50 @@ function showGameoverPanel() {
         }
     }
 
+    gameOverStartTime = Date.now();
     if (panel) panel.classList.add('visible');
 }
 
 function hideGameoverPanel() {
     const panel = document.getElementById('gameover-panel');
     if (panel) panel.classList.remove('visible');
+}
+
+function updateGameoverCountdown() {
+    const countdownTimeEl = document.getElementById('gameover-countdown-time');
+    if (!countdownTimeEl || !gameOverStartTime) return;
+
+    const now = Date.now();
+    const elapsed = now - gameOverStartTime;
+    const remainingMs = Math.max(0, NIGHT_MODE_DELAY - elapsed);
+
+    const minutes = Math.floor(remainingMs / 60000);
+    const seconds = Math.floor((remainingMs % 60000) / 1000);
+    countdownTimeEl.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+
+    if (remainingMs === 0) {
+        enterNightState();
+    }
+}
+
+async function enterNightState() {
+    currentState = STATE_NIGHT;
+    hideGameoverPanel();
+    hidePregamePanel();
+
+    // Hide header bar
+    const headerBar = document.getElementById('header-bar');
+    if (headerBar) headerBar.style.display = 'none';
+
+    await assignNightPalette();
+
+    console.log('Entering night mode');
+}
+
+function exitNightState() {
+    // Show header bar again
+    const headerBar = document.getElementById('header-bar');
+    if (headerBar) headerBar.style.display = 'flex';
 }
 
 function updatePregamePanel() {
@@ -370,6 +411,30 @@ async function assignRandomPalette() {
         console.log(`Palette: ${randomName}`);
     } catch (error) {
         console.error('Failed to load palette:', error);
+    }
+}
+
+async function assignNightPalette() {
+    try {
+        const response = await fetch('/data/palettes.json');
+        const data = await response.json();
+
+        const paletteNames = Object.keys(data.nightPalettes);
+        const randomName = paletteNames[Math.floor(Math.random() * paletteNames.length)];
+        const colors = data.nightPalettes[randomName];
+
+        currentPaletteName = randomName;
+
+        for (let i = 0; i < 4; i++) {
+            teamColors[i + 1] = colors[i];
+        }
+
+        updateColorRGB();
+        initTeamColors();
+
+        console.log(`Night Palette: ${randomName}`);
+    } catch (error) {
+        console.error('Failed to load night palette:', error);
     }
 }
 
@@ -764,6 +829,7 @@ function step(currentTime) {
     }
 
     if (currentState === STATE_GAME_OVER) {
+        updateGameoverCountdown();
         return;
     }
 
@@ -774,6 +840,14 @@ function step(currentTime) {
     if (currentState === STATE_PRE_RUN) {
         canvasContext.clearRect(0, 0, canvas.width, canvas.height);
         updateCountdown();
+        drawGrid();
+        return;
+    }
+
+    if (currentState === STATE_NIGHT) {
+        canvasContext.clearRect(0, 0, canvas.width, canvas.height);
+        nextGeneration();
+        updateTrail();
         drawGrid();
         return;
     }
@@ -807,6 +881,7 @@ async function enterPregameState() {
     currentState = STATE_PRE_RUN;
     currentPhase = PHASE_PALETTE;
     pregameStartTime = Date.now();
+    exitNightState();
     hideGameoverPanel();
     await fetchStats();
     await assignRandomPalette();
@@ -877,6 +952,9 @@ document.addEventListener('keydown', (e) => {
             if (currentState === STATE_PRE_RUN) {
                 advancePhase();
             }
+            break;
+        case '0':
+            enterNightState();
             break;
     }
 });

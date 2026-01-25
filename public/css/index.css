@@ -330,6 +330,29 @@ body {
   font-style: italic;
 }
 
+.gameover-countdown {
+  margin-top: calc(30px * var(--ui-scale));
+  padding-top: calc(20px * var(--ui-scale));
+  border-top: 1px solid rgba(255, 255, 255, 0.2);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(5px * var(--ui-scale));
+}
+
+.gameover-countdown-label {
+  font-size: calc(16px * var(--ui-scale));
+  text-transform: uppercase;
+  letter-spacing: calc(1px * var(--ui-scale));
+  opacity: 0.5;
+}
+
+.gameover-countdown-time {
+  font-size: calc(28px * var(--ui-scale));
+  font-weight: bold;
+  font-variant-numeric: tabular-nums;
+}
+
 #keybinds {
   position: fixed;
   bottom: 20px;
