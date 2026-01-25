@@ -33,7 +33,8 @@ const cellSize = 8;
 const frameRate = 14;
 const frameInterval = 1000 / frameRate;
 const trailFade = 0.005; // closer to 1 = faster fade
-let spawnChance = 0.0005;
+const initialSpawnChance = 0.0005;
+let spawnChance = initialSpawnChance;
 const scoreboardInterval = 5;
 const showKeybinds = false; // toggle keybinds panel visibility
 
@@ -46,6 +47,7 @@ const STATE_PAUSED = 'paused';
 
 // event states
 const EVENT_COMETS = 'comets';
+const EVENT_DROUGHT = 'drought';
 
 // comet event config
 const cometMinRadius = 3;
@@ -82,14 +84,12 @@ const teamCounts = [0, 0, 0, 0, 0];
 
 function updateScoreboard() {
     teamCounts.fill(0);
-
     for (let r = 0; r < grid.length; r++) {
         for (let c = 0; c < grid[r].length; c++) {
             const cell = grid[r][c];
             if (cell > 0) teamCounts[cell]++;
         }
     }
-
     for (let i = 1; i <= 4; i++) {
         const el = document.getElementById(`count-${i}`);
         if (el) el.textContent = teamCounts[i];
@@ -144,22 +144,29 @@ assignRandomTeamNames();
 // 3. INIT STATE
 // ================================
 
-grid = [];
-
 const rows = Math.floor(canvas.height / cellSize);
 const cols = Math.floor(canvas.width / cellSize);
 
+// Double buffer to avoid allocations each frame
+let grid = [];
+let gridBuffer = [];
+
 for (let r = 0; r < rows; r++) {
     const row = [];
+    const bufferRow = [];
     for (let c = 0; c < cols; c++) {
         if (Math.random() < 0.5) {
             row.push(0); // dead
+            bufferRow.push(0);
         } else {
             // random color, like rain
-            row.push(Math.floor(Math.random() * 4) + 1);
+            const color = Math.floor(Math.random() * 4) + 1;
+            row.push(color);
+            bufferRow.push(0);
         }
     }
     grid.push(row);
+    gridBuffer.push(bufferRow);
 }
 
 let trailGrid = [];
@@ -172,9 +179,7 @@ for (let r = 0; r < rows; r++) {
     trailGrid.push(row);
 }
 
-// Initial scoreboard update
 updateScoreboard();
-
 
 // ================================
 // 4. DRAW
@@ -184,7 +189,6 @@ function drawGrid() {
     for (let row = 0; row < trailGrid.length; row++) {
         for (let col = 0; col < trailGrid[row].length; col++) {
             const { color, brightness } = trailGrid[row][col];
-            // Skip fully faded cells to show background through canvas
             if (brightness === 0) continue;
             const [r, g, b] = colorRGB[color];
             canvasContext.fillStyle = `rgba(${r * brightness}, ${g * brightness}, ${b * brightness}, ${brightness})`;
@@ -203,7 +207,8 @@ function updateTrail() {
         for (let col = 0; col < grid[row].length; col++) {
             const cell = grid[row][col];
             if (cell > 0) {
-                trailGrid[row][col] = { color: cell, brightness: 1 };
+                trailGrid[row][col].color = cell;
+                trailGrid[row][col].brightness = 1;
             } else {
                 trailGrid[row][col].brightness = Math.max(0, trailGrid[row][col].brightness - trailFade);
             }
@@ -226,14 +231,11 @@ function spawnExplosion() {
 
     for (let r = -radius; r <= radius; r++) {
         for (let c = -radius; c <= radius; c++) {
-            // Check if within circle
             if (r * r + c * c <= radius * radius) {
                 const targetRow = centerRow + r;
                 const targetCol = centerCol + c;
-                // Bounds check
                 if (targetRow >= 0 && targetRow < rows && targetCol >= 0 && targetCol < cols) {
                     grid[targetRow][targetCol] = color;
-                    // Set brightness to 0 for dead cells (transparent holes)
                     trailGrid[targetRow][targetCol] = { color: color, brightness: color > 0 ? 1 : 0 };
                 }
             }
@@ -242,13 +244,23 @@ function spawnExplosion() {
 }
 
 
+function lowerSpawnChance() {
+    spawnChance = Math.max(0, spawnChance - 0.0001);
+}
+
+
 // ================================
 // 6. ITERATE NEXT GEN
 // ================================
 
+// Pre-allocated arrays to avoid GC pressure
+const colorCounts = [0, 0, 0, 0, 0];
+const dominantColors = [0, 0, 0, 0];
+const neighborResult = { count: 0, dominantColor: 0 };
+
 function getNeighborInfo(row, col, currentGrid) {
     let count = 0;
-    const colorCounts = [0, 0, 0, 0, 0]; // index 0 used for dead, 1-4 for colors
+    colorCounts[0] = 0; colorCounts[1] = 0; colorCounts[2] = 0; colorCounts[3] = 0; colorCounts[4] = 0;
 
     for (let rOffset = -1; rOffset <= 1; rOffset++) {
         for (let cOffset = -1; cOffset <= 1; cOffset++) {
@@ -269,54 +281,52 @@ function getNeighborInfo(row, col, currentGrid) {
             }
         }
     }
-    // tie brake if multiple colors have same max count
+    // tie break if multiple colors have same max count
     let maxCount = 0;
-    let dominantColors = [];
+    let numDominant = 0;
     for (let i = 1; i <= 4; i++) {
         if (colorCounts[i] > maxCount) {
             maxCount = colorCounts[i];
-            dominantColors = [i];
+            dominantColors[0] = i;
+            numDominant = 1;
         } else if (colorCounts[i] === maxCount && maxCount > 0) {
-            dominantColors.push(i);
+            dominantColors[numDominant++] = i;
         }
     }
-    const dominantColor =
-        dominantColors.length > 0
-            ? dominantColors[Math.floor(Math.random() * dominantColors.length)]
-            : 0;
-    return { count, dominantColor };
+    neighborResult.count = count;
+    neighborResult.dominantColor = numDominant > 0
+        ? dominantColors[Math.floor(Math.random() * numDominant)]
+        : 0;
+    return neighborResult;
 }
 
-function nextGeneration(currentGrid) {
-    const newGrid = [];
-
-    for (let row = 0; row < currentGrid.length; row++) {
-        const newRow = [];
-
-        for (let col = 0; col < currentGrid[row].length; col++) {
-            const currentCell = currentGrid[row][col];
+function nextGeneration() {
+    for (let row = 0; row < grid.length; row++) {
+        for (let col = 0; col < grid[row].length; col++) {
+            const currentCell = grid[row][col];
             const alive = currentCell > 0;
-            const { count, dominantColor } = getNeighborInfo(row, col, currentGrid);
+            const { count, dominantColor } = getNeighborInfo(row, col, grid);
 
             if (alive) {
                 if (count === 2 || count === 3) {
-                    newRow.push(dominantColor);
+                    gridBuffer[row][col] = dominantColor;
                 } else {
-                    newRow.push(0); // die
+                    gridBuffer[row][col] = 0; // die
                 }
             } else {
                 if (count === 3) {
-                    newRow.push(dominantColor);
+                    gridBuffer[row][col] = dominantColor;
                 } else if (Math.random() < spawnChance) {
-                    newRow.push(Math.floor(Math.random() * 4) + 1);
+                    gridBuffer[row][col] = Math.floor(Math.random() * 4) + 1;
                 } else {
-                    newRow.push(0); // stay dead
+                    gridBuffer[row][col] = 0; // stay dead
                 }
             }
         }
-        newGrid.push(newRow);
     }
-    return newGrid;
+    const temp = grid;
+    grid = gridBuffer;
+    gridBuffer = temp;
 }
 
 
@@ -332,7 +342,6 @@ function step(currentTime) {
 
     updateClock();
 
-    // Event takes priority over game state
     if (currentEvent === EVENT_COMETS) {
         canvasContext.clearRect(0, 0, canvas.width, canvas.height);
         if (frameCount % cometSpawnInterval === 0) {
@@ -343,6 +352,10 @@ function step(currentTime) {
         }
         drawGrid();
         return;
+    }
+
+    if (currentEvent === EVENT_DROUGHT) {
+        lowerSpawnChance();
     }
 
     if (currentState === STATE_GAME_OVER) {
@@ -361,7 +374,7 @@ function step(currentTime) {
 
     if (currentState === STATE_RUNNING) {
         canvasContext.clearRect(0, 0, canvas.width, canvas.height);
-        grid = nextGeneration(grid);
+        nextGeneration();
         updateTrail();
         if (frameCount % scoreboardInterval === 0) {
             updateScoreboard();
@@ -380,7 +393,6 @@ requestAnimationFrame(step);
 const keybindsEl = document.getElementById('keybinds');
 const eventTextEl = document.getElementById('event-text');
 
-// Show keybinds on load if config enabled
 if (showKeybinds && keybindsEl) {
     keybindsEl.classList.add('visible');
 }
@@ -411,6 +423,22 @@ document.addEventListener('keydown', (e) => {
                 currentEvent = EVENT_COMETS;
                 if (eventTextEl) {
                     eventTextEl.textContent = 'COMETS!';
+                    eventTextEl.classList.add('event-active');
+                }
+            }
+            break;
+        case '6':
+            if (currentEvent === EVENT_DROUGHT) {
+                currentEvent = null;
+                spawnChance = initialSpawnChance;
+                if (eventTextEl) {
+                    eventTextEl.textContent = 'NO EVENT';
+                    eventTextEl.classList.remove('event-active');
+                }
+            } else {
+                currentEvent = EVENT_DROUGHT;
+                if (eventTextEl) {
+                    eventTextEl.textContent = 'DROUGHT!';
                     eventTextEl.classList.add('event-active');
                 }
             }

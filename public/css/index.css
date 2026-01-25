@@ -12,7 +12,7 @@ body {
   margin: 0;
   padding: 0;
   overflow: hidden;
-  background: rgb(230, 223, 223);
+  background: rgb(0, 0, 0);
   font-family: var(--main-font);
 }
 
@@ -32,7 +32,7 @@ body {
 
 #header-bar {
   position: fixed;
-  width: 40%;
+  width: 50%;
   height: auto;
   top: -1;
   left: 50%;
@@ -136,7 +136,7 @@ body {
 
 .team-label {
   display: inline-block;
-  width: 150px;
+  width: 200px;
   text-align: left;
   white-space: nowrap;
   overflow: hidden;
@@ -144,7 +144,7 @@ body {
 
 .team-count {
   display: inline-block;
-  width: 70px;
+  width: 100px;
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
