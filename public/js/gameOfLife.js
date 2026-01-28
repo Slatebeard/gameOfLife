@@ -50,12 +50,12 @@ const initialSpawnChance = 0.0005;
 let spawnChance = initialSpawnChance;
 const scoreboardInterval = 5;
 const showKeybinds = false;
-const fireworkLaunchInterval = 500;
 
 // debug toggles
 let debugShowTrails = true;
 let debugTrailsOnly = false;
 let debugShowMetrics = false;
+let scheduleEnabled = false;
 
 // performance metrics
 let fpsCounter = 0;
@@ -116,6 +116,7 @@ let currentPaletteName = '';
 let currentCategoryName = '';
 let actualTeamNames = ['', '', '', ''];
 let gameStats = null;
+let isNightPalette = false;
 
 function hexToRGB(hex) {
     // regex magic, no idea how it works, thanks gippity
@@ -214,7 +215,6 @@ function updateGameoverCountdown() {
 }
 
 async function enterNightState() {
-    resetFireworks();
     hideGameoverPanel();
     hidePregamePanel();
 
@@ -416,6 +416,7 @@ async function assignRandomPalette() {
         const colors = data.palettes[randomName];
 
         currentPaletteName = randomName;
+        isNightPalette = false;
 
         for (let i = 0; i < 4; i++) {
             teamColors[i + 1] = colors[i];
@@ -431,6 +432,11 @@ async function assignRandomPalette() {
 }
 
 async function assignNightPalette() {
+    if (isNightPalette) {
+        console.log(`Keeping night palette: ${currentPaletteName}`);
+        return;
+    }
+
     try {
         const response = await fetch('/data/palettes.json');
         const data = await response.json();
@@ -440,6 +446,7 @@ async function assignNightPalette() {
         const colors = data.nightPalettes[randomName];
 
         currentPaletteName = randomName;
+        isNightPalette = true;
 
         for (let i = 0; i < 4; i++) {
             teamColors[i + 1] = colors[i];
@@ -732,6 +739,7 @@ function updateMetricsPanel(currentTime) {
         document.getElementById('debug-state').textContent = currentState;
         document.getElementById('debug-trails').textContent = debugShowTrails ? 'ON' : 'OFF';
         document.getElementById('debug-trails-only').textContent = debugTrailsOnly ? 'ON' : 'OFF';
+        document.getElementById('debug-schedule').textContent = scheduleEnabled ? 'ON' : 'OFF';
     } else {
         panel.classList.remove('visible');
     }
@@ -767,101 +775,6 @@ function spawnExplosion() {
 
 function lowerSpawnChance() {
     spawnChance = Math.max(0, spawnChance - 0.0001);
-}
-
-
-// ================================
-// 5b. FIREWORKS
-// ================================
-
-let fireworks = [];
-let fireworkParticles = [];
-
-function launchFirework() {
-    const x = Math.random() * canvas.width;
-    const y = canvas.height;
-    const targetY = canvas.height * 0.2 + Math.random() * canvas.height * 0.4;
-    // Random color from today's palette
-    const color = teamColors[Math.floor(Math.random() * 4) + 1];
-
-    fireworks.push({
-        x: x,
-        y: y,
-        targetY: targetY,
-        speed: 8 + Math.random() * 4,
-        color: color
-    });
-}
-
-function explodeFirework(firework) {
-    const particleCount = 60 + Math.floor(Math.random() * 40);
-    for (let i = 0; i < particleCount; i++) {
-        const angle = (Math.PI * 2 / particleCount) * i + Math.random() * 0.2;
-        const speed = 2 + Math.random() * 4;
-        fireworkParticles.push({
-            x: firework.x,
-            y: firework.y,
-            vx: Math.cos(angle) * speed,
-            vy: Math.sin(angle) * speed,
-            life: 1.0,
-            decay: 0.015 + Math.random() * 0.01,
-            color: firework.color,
-            size: 2 + Math.random() * 2
-        });
-    }
-}
-
-function updateFireworks() {
-    for (let i = fireworks.length - 1; i >= 0; i--) {
-        const fw = fireworks[i];
-        fw.y -= fw.speed;
-
-        if (fw.y <= fw.targetY) {
-            explodeFirework(fw);
-            fireworks.splice(i, 1);
-        }
-    }
-
-    for (let i = fireworkParticles.length - 1; i >= 0; i--) {
-        const p = fireworkParticles[i];
-        p.x += p.vx;
-        p.y += p.vy;
-        p.vy += 0.05; // gravity
-        p.vx *= 0.99; // drag
-        p.life -= p.decay;
-
-        if (p.life <= 0) {
-            fireworkParticles.splice(i, 1);
-        }
-    }
-}
-
-function drawFireworks() {
-    for (const fw of fireworks) {
-        canvasContext.beginPath();
-        canvasContext.arc(fw.x, fw.y, 3, 0, Math.PI * 2);
-        canvasContext.fillStyle = fw.color;
-        canvasContext.fill();
-
-        canvasContext.beginPath();
-        canvasContext.moveTo(fw.x, fw.y);
-        canvasContext.lineTo(fw.x, fw.y + 20);
-        canvasContext.strokeStyle = fw.color;
-        canvasContext.lineWidth = 2;
-        canvasContext.stroke();
-    }
-
-    for (const p of fireworkParticles) {
-        canvasContext.beginPath();
-        canvasContext.arc(p.x, p.y, p.size * p.life, 0, Math.PI * 2);
-        canvasContext.fillStyle = p.color + Math.floor(p.life * 255).toString(16).padStart(2, '0');
-        canvasContext.fill();
-    }
-}
-
-function resetFireworks() {
-    fireworks = [];
-    fireworkParticles = [];
 }
 
 
@@ -947,7 +860,6 @@ function nextGeneration() {
 
 let lastFrameTime = 0;
 let frameCount = 0;
-let lastFireworkLaunch = 0;
 
 function step(currentTime) {
     requestAnimationFrame(step);
@@ -1026,7 +938,290 @@ requestAnimationFrame(step);
 
 
 // ================================
-// 7. KEYBINDS
+// 7. STATE PERSISTENCE
+// ================================
+
+const STATE_VERSION = 1;
+const STATE_SAVE_INTERVAL = 5000; // 5 seconds
+const STATE_MAX_AGE = 24 * 60 * 60 * 1000;
+const SCHEDULE_CHECK_INTERVAL = 30000;
+
+let stateSaveTimer = null;
+let scheduleCheckTimer = null;
+
+function collectGameState() {
+    return {
+        version: STATE_VERSION,
+        currentState: currentState,
+        currentPhase: currentPhase,
+        pregameStartTime: pregameStartTime,
+        gameOverStartTime: gameOverStartTime,
+        gridDimensions: { rows: rows, cols: cols },
+        grid: grid,
+        trailGrid: trailGrid,
+        teamColors: teamColors,
+        currentPaletteName: currentPaletteName,
+        currentCategoryName: currentCategoryName,
+        actualTeamNames: actualTeamNames,
+        teamCounts: teamCounts,
+        currentEvent: currentEvent,
+        spawnChance: spawnChance,
+        isNightPalette: isNightPalette
+    };
+}
+
+async function saveGameStateToServer() {
+    try {
+        const state = collectGameState();
+        await fetch('/api/state', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(state)
+        });
+    } catch (error) {
+        console.error('Failed to save game state:', error);
+    }
+}
+
+function scheduleSaveState() {
+    if (stateSaveTimer) {
+        clearInterval(stateSaveTimer);
+    }
+    stateSaveTimer = setInterval(saveGameStateToServer, STATE_SAVE_INTERVAL);
+}
+
+// ================================
+// 7b. AUTOMATIC SCHEDULE
+// ================================
+
+async function toggleSchedule() {
+    try {
+        const response = await fetch('/api/schedule/toggle', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({})
+        });
+        const data = await response.json();
+        scheduleEnabled = data.enabled;
+        console.log(`Schedule: ${scheduleEnabled ? 'enabled' : 'disabled'}`);
+    } catch (error) {
+        console.error('Failed to toggle schedule:', error);
+    }
+}
+
+async function resetGameState() {
+    try {
+        await fetch('/api/state', { method: 'DELETE' });
+        console.log('Game state cleared, reinitializing...');
+        // Reset night palette flag so a fresh palette is chosen
+        isNightPalette = false;
+        await enterPregameState();
+    } catch (error) {
+        console.error('Failed to reset game state:', error);
+    }
+}
+
+async function checkSchedule() {
+    try {
+        const response = await fetch('/api/schedule');
+        const data = await response.json();
+
+        // Sync local state
+        scheduleEnabled = data.enabled;
+
+        // Skip automatic transitions if schedule is disabled
+        if (!data.enabled) {
+            return;
+        }
+
+        const expected = data.expected;
+
+        // Check if state transition needed
+        if (expected.state !== currentState) {
+            console.log(`Schedule: transitioning ${currentState} -> ${expected.state}`);
+            await transitionToState(expected.state, expected.phase);
+        }
+        // Check if phase advance needed (within pregame)
+        else if (currentState === STATE_PRE_RUN && expected.phase !== currentPhase) {
+            const phaseOrder = ['palette', 'teams', 'stats', 'ready'];
+            const currentIdx = phaseOrder.indexOf(currentPhase);
+            const expectedIdx = phaseOrder.indexOf(expected.phase);
+            if (expectedIdx > currentIdx) {
+                console.log(`Schedule: advancing phase ${currentPhase} -> ${expected.phase}`);
+                while (currentPhase !== expected.phase && getNextPhase()) {
+                    advancePhase();
+                }
+            }
+        }
+    } catch (error) {
+        console.error('Failed to check schedule:', error);
+    }
+}
+
+async function transitionToState(targetState, targetPhase) {
+    switch (targetState) {
+        case 'preRun':
+            await enterPregameState();
+            // Advance to correct phase if needed
+            if (targetPhase) {
+                const phaseOrder = ['palette', 'teams', 'stats', 'ready'];
+                const targetIdx = phaseOrder.indexOf(targetPhase);
+                while (phaseOrder.indexOf(currentPhase) < targetIdx && getNextPhase()) {
+                    advancePhase();
+                }
+            }
+            break;
+        case 'running':
+            currentState = STATE_RUNNING;
+            currentPhase = PHASE_READY;
+            updateHeaderBarTeams();
+            hidePregamePanel();
+            hideGameoverPanel();
+            break;
+        case 'gameOver':
+            currentState = STATE_GAME_OVER;
+            updateScoreboard();
+            await showGameoverPanel();
+            await recordGameEnd();
+            break;
+        case 'night':
+            await enterNightState();
+            break;
+    }
+}
+
+function startScheduleChecker() {
+    // Initial check
+    checkSchedule();
+    // Periodic checks
+    if (scheduleCheckTimer) {
+        clearInterval(scheduleCheckTimer);
+    }
+    scheduleCheckTimer = setInterval(checkSchedule, SCHEDULE_CHECK_INTERVAL);
+}
+
+async function restoreGameState() {
+    try {
+        const response = await fetch('/api/state');
+        if (response.status === 204) {
+            console.log('No saved state found, starting fresh');
+            return false;
+        }
+
+        const state = await response.json();
+
+        // Validate version
+        if (state.version !== STATE_VERSION) {
+            console.log('State version mismatch, starting fresh');
+            return false;
+        }
+
+        // Check for stale state (>24 hours)
+        if (state.savedAt) {
+            const savedTime = new Date(state.savedAt).getTime();
+            if (Date.now() - savedTime > STATE_MAX_AGE) {
+                console.log('State too old, starting fresh');
+                return false;
+            }
+        }
+
+        // Check grid dimensions match
+        if (state.gridDimensions.rows !== rows || state.gridDimensions.cols !== cols) {
+            console.log('Grid dimensions changed, starting fresh');
+            return false;
+        }
+
+        // Restore state variables
+        currentState = state.currentState;
+        currentPhase = state.currentPhase;
+        pregameStartTime = state.pregameStartTime;
+        gameOverStartTime = state.gameOverStartTime;
+        grid = state.grid;
+        trailGrid = state.trailGrid;
+        teamColors = state.teamColors;
+        currentPaletteName = state.currentPaletteName;
+        currentCategoryName = state.currentCategoryName;
+        actualTeamNames = state.actualTeamNames;
+        teamCounts[0] = state.teamCounts[0];
+        teamCounts[1] = state.teamCounts[1];
+        teamCounts[2] = state.teamCounts[2];
+        teamCounts[3] = state.teamCounts[3];
+        teamCounts[4] = state.teamCounts[4];
+        currentEvent = state.currentEvent;
+        spawnChance = state.spawnChance;
+        isNightPalette = state.isNightPalette || false;
+
+        // Update derived state
+        updateColorRGB();
+        initTeamColors();
+        updateScoreboard();
+
+        // Restore UI based on state
+        if (currentState === STATE_PRE_RUN) {
+            fetchStats().then(() => {
+                updatePregamePanel();
+                showPregamePanel();
+            });
+            updateHeaderBarTeams();
+        } else if (currentState === STATE_GAME_OVER) {
+            showGameoverPanel();
+        } else if (currentState === STATE_NIGHT) {
+            const headerBar = document.getElementById('header-bar');
+            if (headerBar) headerBar.style.display = 'none';
+        } else {
+            // Running or paused
+            hidePregamePanel();
+            hideGameoverPanel();
+            updateHeaderBarTeams();
+        }
+
+        // Update event display
+        const eventTextEl = document.getElementById('event-text');
+        if (eventTextEl) {
+            if (currentEvent === EVENT_COMETS) {
+                eventTextEl.textContent = 'COMETS!';
+                eventTextEl.classList.add('event-active');
+            } else if (currentEvent === EVENT_DROUGHT) {
+                eventTextEl.textContent = 'DROUGHT!';
+                eventTextEl.classList.add('event-active');
+            } else {
+                eventTextEl.textContent = 'NO EVENT';
+                eventTextEl.classList.remove('event-active');
+            }
+        }
+
+        console.log(`Restored game state: ${currentState}`);
+        return true;
+    } catch (error) {
+        console.error('Failed to restore game state:', error);
+        return false;
+    }
+}
+
+async function initialize() {
+    const restored = await restoreGameState();
+    if (!restored) {
+        // Check if schedule is enabled to determine initial state
+        try {
+            const response = await fetch('/api/schedule');
+            const data = await response.json();
+            if (data.enabled) {
+                await transitionToState(data.expected.state, data.expected.phase);
+            } else {
+                // Schedule disabled - start in pregame
+                await enterPregameState();
+            }
+        } catch (error) {
+            console.error('Failed to check schedule on init:', error);
+            await enterPregameState();
+        }
+    }
+    scheduleSaveState();
+    startScheduleChecker();
+}
+
+// ================================
+// 8. KEYBINDS
 // ================================
 
 const keybindsEl = document.getElementById('keybinds');
@@ -1129,8 +1324,16 @@ document.addEventListener('keydown', (e) => {
         case 'D':
             debugShowMetrics = !debugShowMetrics;
             break;
+        case 's':
+        case 'S':
+            toggleSchedule();
+            break;
+        case 'r':
+        case 'R':
+            resetGameState();
+            break;
     }
 });
 
-// Initialize in pregame state with reveal panel
-enterPregameState();
+// Initialize - try to restore state, fall back to fresh pregame
+initialize();

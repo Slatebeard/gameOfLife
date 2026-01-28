@@ -1,8 +1,8 @@
 {
     "lastWinner": {
-        "name": "Circle K",
-        "color": "#151540",
-        "date": "2026-01-25T21:36:17.321Z"
+        "name": "Oracle",
+        "color": "#0a1a0a",
+        "date": "2026-01-28T20:54:53.263Z"
     },
     "mostPlayedPalette": {
         "name": "Dead Forest",
@@ -35,10 +35,15 @@
         "Look Of Horror": 1,
         "Obsidian Rose": 1,
         "Hound Root": 1,
-        "Midnight Blue": 1
+        "Midnight Blue": 1,
+        "Twilight": 1,
+        "Void": 1,
+        "Dusk": 1,
+        "Starfield": 1,
+        "Aurora": 1
     },
     "categoryCounts": {
-        "Tech Companies": 1,
+        "Tech Companies": 2,
         "Movie Characters": 4,
         "Vegetables": 2,
         "Game Franchises": 2,
@@ -48,7 +53,8 @@
         "Animals": 1,
         "Convinience Store Chains": 2,
         "Coding Languages": 1,
-        "Video Game Consoles": 1
+        "Video Game Consoles": 1,
+        "Where's The Food?": 1
     },
-    "gamesPlayed": 19
+    "gamesPlayed": 24
 }
