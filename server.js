@@ -4,10 +4,6 @@ import { serve } from "@hono/node-server";
 import { getConnInfo } from "@hono/node-server/conninfo";
 import { readFileSync, writeFileSync, existsSync } from "fs";
 
-// ================================
-// ACCESS TOKEN FOR KIOSK DEVICE
-// ================================
-// Set this to a secret value - kiosk accesses game via /?token=YOUR_SECRET
 const ACCESS_TOKEN = process.env.GAME_TOKEN || "life";
 
 // ================================
@@ -325,7 +321,26 @@ app.get("/score", (c) => {
 app.use("/*", async (c, next) => {
   const path = c.req.path;
 
+  // Allow /score and /api/ without token
   if (path === "/score" || path.startsWith("/api/")) {
+    return next();
+  }
+
+  const staticExtensions = [
+    ".css",
+    ".js",
+    ".json",
+    ".ttf",
+    ".woff",
+    ".woff2",
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".gif",
+    ".svg",
+    ".ico",
+  ];
+  if (staticExtensions.some((ext) => path.endsWith(ext))) {
     return next();
   }
 
