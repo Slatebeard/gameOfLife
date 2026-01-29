@@ -65,9 +65,23 @@ body {
   border-right: 1px solid rgba(255, 255, 255, 0.3);
 }
 
+#event-text {
+  animation: event-breathe 4s ease-in-out infinite;
+}
+
 #event-text.event-active {
   display: inline-block;
   animation: event-pulse 0.5s ease-in-out infinite;
+}
+
+@keyframes event-breathe {
+  0%,
+  100% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 1;
+  }
 }
 
 @keyframes event-pulse {

@@ -9,7 +9,7 @@ const ACCESS_TOKEN = process.env.GAME_TOKEN || "life";
 // ================================
 // DAILY SCHEDULE (24-hour format)
 // ================================
-let scheduleEnabled = false; // Set to true to enable automatic state transitions
+let scheduleEnabled = true;
 
 const SCHEDULE = {
   PREGAME_START: "08:45",
