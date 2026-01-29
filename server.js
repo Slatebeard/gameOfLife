@@ -4,7 +4,115 @@ import { serve } from '@hono/node-server'
 import { getConnInfo } from '@hono/node-server/conninfo'
 import { readFileSync, writeFileSync, existsSync } from 'fs'
 
+// ================================
+// DAILY SCHEDULE (24-hour format)
+// ================================
+let scheduleEnabled = false  // Set to true to enable automatic state transitions
+
+const SCHEDULE = {
+    PREGAME_START: '08:45',
+    REVEAL_TEAMS: '08:50',
+    REVEAL_STATS: '09:00',
+    GAME_START: '09:15',
+    GAME_END: '17:00',
+    NIGHT_START: '17:10'
+}
+
+function parseTimeToMinutes(timeStr) {
+    const [hours, minutes] = timeStr.split(':').map(Number)
+    return hours * 60 + minutes
+}
+
+function getCurrentTimeMinutes() {
+    const now = new Date()
+    return now.getHours() * 60 + now.getMinutes()
+}
+
+function getExpectedState() {
+    const now = getCurrentTimeMinutes()
+    const times = {
+        pregame: parseTimeToMinutes(SCHEDULE.PREGAME_START),
+        teams: parseTimeToMinutes(SCHEDULE.REVEAL_TEAMS),
+        stats: parseTimeToMinutes(SCHEDULE.REVEAL_STATS),
+        gameStart: parseTimeToMinutes(SCHEDULE.GAME_START),
+        gameEnd: parseTimeToMinutes(SCHEDULE.GAME_END),
+        night: parseTimeToMinutes(SCHEDULE.NIGHT_START)
+    }
+
+    if (now >= times.night || now < times.pregame) {
+        return { state: 'night', phase: null }
+    }
+    if (now >= times.gameEnd) {
+        return { state: 'gameOver', phase: null }
+    }
+    if (now >= times.gameStart) {
+        return { state: 'running', phase: 'ready' }
+    }
+    if (now >= times.stats) {
+        return { state: 'preRun', phase: 'stats' }
+    }
+    if (now >= times.teams) {
+        return { state: 'preRun', phase: 'teams' }
+    }
+    return { state: 'preRun', phase: 'palette' }
+}
+
 const STATS_FILE = './data/stats.json'
+const STATE_FILE = './data/gameState.json'
+
+let currentGameState = null
+
+let saveStateTimeout = null
+const SAVE_DEBOUNCE_MS = 5000
+
+function loadGameState() {
+    try {
+        if (existsSync(STATE_FILE)) {
+            const data = JSON.parse(readFileSync(STATE_FILE, 'utf-8'))
+            if (data.version === 1) {
+                return data
+            }
+        }
+    } catch (error) {
+        console.error('Failed to load game state:', error)
+    }
+    return null
+}
+
+function saveGameState(state) {
+    try {
+        writeFileSync(STATE_FILE, JSON.stringify(state))
+    } catch (error) {
+        console.error('Failed to save game state:', error)
+    }
+}
+
+function formatStateLog(state) {
+    if (!state) return 'null'
+    const scores = state.teamCounts?.slice(1).map((c, i) =>
+        `${state.actualTeamNames?.[i] || `Team ${i + 1}`}: ${c?.toLocaleString() || 0}`
+    ).join(', ')
+    return `[${state.currentState}/${state.currentPhase}] ${scores}`
+}
+
+function debouncedSaveState() {
+    if (saveStateTimeout) {
+        clearTimeout(saveStateTimeout)
+    }
+    saveStateTimeout = setTimeout(() => {
+        if (currentGameState) {
+            saveGameState(currentGameState)
+            console.log(`[${new Date().toLocaleTimeString()}] State saved to disk: ${formatStateLog(currentGameState)}`)
+        }
+    }, SAVE_DEBOUNCE_MS)
+}
+
+currentGameState = loadGameState()
+if (currentGameState) {
+    console.log(`Loaded game state from disk: ${formatStateLog(currentGameState)}`)
+} else {
+    console.log('No saved state found, will start fresh')
+}
 
 function loadStats() {
     try {
@@ -70,16 +178,65 @@ app.get('/api/stats', (c) => {
     return c.json(stats)
 })
 
+app.get('/api/schedule', (c) => {
+    const expected = getExpectedState()
+    return c.json({
+        enabled: scheduleEnabled,
+        schedule: SCHEDULE,
+        expected: expected,
+        serverTime: new Date().toISOString()
+    })
+})
+
+app.post('/api/schedule/toggle', async (c) => {
+    const body = await c.req.json()
+    if (typeof body.enabled === 'boolean') {
+        scheduleEnabled = body.enabled
+    } else {
+        scheduleEnabled = !scheduleEnabled
+    }
+    console.log(`[${new Date().toLocaleTimeString()}] Schedule ${scheduleEnabled ? 'enabled' : 'disabled'}`)
+    return c.json({ enabled: scheduleEnabled })
+})
+
+app.get('/api/state', (c) => {
+    if (currentGameState) {
+        return c.json(currentGameState)
+    }
+    return c.body(null, 204)
+})
+
+app.post('/api/state', async (c) => {
+    const body = await c.req.json()
+    const prevState = currentGameState?.currentState
+    currentGameState = {
+        ...body,
+        savedAt: new Date().toISOString()
+    }
+    if (prevState !== currentGameState.currentState) {
+        console.log(`[${new Date().toLocaleTimeString()}] State changed: ${prevState || 'none'} → ${currentGameState.currentState}`)
+    }
+    debouncedSaveState()
+    return c.json({ success: true })
+})
+
+app.delete('/api/state', (c) => {
+    currentGameState = null
+    if (existsSync(STATE_FILE)) {
+        writeFileSync(STATE_FILE, '{}')
+    }
+    console.log(`[${new Date().toLocaleTimeString()}] Game state cleared`)
+    return c.json({ success: true })
+})
+
 app.post('/api/game-end', async (c) => {
     const body = await c.req.json()
     const { winner, palette, category } = body
 
     const stats = loadStats()
 
-    // Update games played
     stats.gamesPlayed++
 
-    // Update last winner
     if (winner) {
         stats.lastWinner = {
             name: winner.name,
@@ -87,7 +244,6 @@ app.post('/api/game-end', async (c) => {
             date: new Date().toISOString()
         }
 
-        // Check if this is the highest score ever
         if (winner.count > stats.highestScore.count) {
             stats.highestScore = {
                 name: winner.name,
@@ -98,11 +254,9 @@ app.post('/api/game-end', async (c) => {
         }
     }
 
-    // Update palette counts
     if (palette) {
         stats.paletteCounts[palette] = (stats.paletteCounts[palette] || 0) + 1
 
-        // Recalculate most played palette
         let maxPalette = null
         let maxPaletteCount = 0
         for (const [name, count] of Object.entries(stats.paletteCounts)) {
@@ -114,11 +268,9 @@ app.post('/api/game-end', async (c) => {
         stats.mostPlayedPalette = { name: maxPalette, count: maxPaletteCount }
     }
 
-    // Update category counts
     if (category) {
         stats.categoryCounts[category] = (stats.categoryCounts[category] || 0) + 1
 
-        // Recalculate most played category
         let maxCategory = null
         let maxCategoryCount = 0
         for (const [name, count] of Object.entries(stats.categoryCounts)) {
@@ -131,6 +283,7 @@ app.post('/api/game-end', async (c) => {
     }
 
     saveStats(stats)
+    console.log(`[${new Date().toLocaleTimeString()}] Game #${stats.gamesPlayed} ended - Winner: ${winner?.name || 'none'} (${winner?.count?.toLocaleString() || 0} cells)`)
     return c.json({ success: true, stats })
 })
 
