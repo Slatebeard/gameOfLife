@@ -62,6 +62,10 @@ let fpsCounter = 0;
 let lastFpsUpdate = 0;
 let currentFps = 0;
 
+// sync rate limiter
+const SYNC_RATE_LIMIT_MS = 60000;
+let lastSyncTs = 0;
+
 // game states
 const STATE_PRE_RUN = 'preRun';
 const STATE_RUNNING = 'running';
@@ -463,7 +467,7 @@ async function assignNightPalette() {
 
 const teamCounts = [0, 0, 0, 0, 0];
 
-function updateScoreboard() {
+function updateScoreboard(forceSync, currentTime) {
     teamCounts.fill(0);
     for (let r = 0; r < grid.length; r++) {
         for (let c = 0; c < grid[r].length; c++) {
@@ -476,10 +480,18 @@ function updateScoreboard() {
         if (el) el.textContent = teamCounts[i];
     }
 
-    sendScoresToServer();
+    sendScoresToServer(forceSync, currentTime);
 }
 
-function sendScoresToServer() {
+function sendScoresToServer(forceSync, currentTime) {
+    if (!forceSync && (currentTime - lastSyncTs < SYNC_RATE_LIMIT_MS)) {
+        return;
+    }
+
+    if (currentTime > 0) {
+        lastSyncTs = currentTime;
+    }
+
     const teams = [];
     for (let i = 1; i <= 4; i++) {
         teams.push({
@@ -662,13 +674,13 @@ function resetGrid() {
     }
 
     canvasContext.clearRect(0, 0, canvas.width, canvas.height);
-    updateScoreboard();
+    updateScoreboard(true, 0);
     drawGrid();
 }
 
 resetGrid();
 
-updateScoreboard();
+updateScoreboard(true, 0);
 
 // ================================
 // 4. DRAW
@@ -894,7 +906,7 @@ function step(currentTime) {
             spawnExplosion();
         }
         if (frameCount % scoreboardInterval === 0) {
-            updateScoreboard();
+            updateScoreboard(false, currentTime);
         }
         drawGrid();
         return;
@@ -928,7 +940,7 @@ function step(currentTime) {
         nextGeneration();
         updateTrail();
         if (frameCount % scoreboardInterval === 0) {
-            updateScoreboard();
+            updateScoreboard(false, currentTime);
         }
         drawGrid();
     }
@@ -1080,7 +1092,7 @@ async function transitionToState(targetState, targetPhase) {
             break;
         case 'gameOver':
             currentState = STATE_GAME_OVER;
-            updateScoreboard();
+            updateScoreboard(true, 0);
             await showGameoverPanel();
             await recordGameEnd();
             break;
@@ -1154,7 +1166,7 @@ async function restoreGameState() {
         // Update derived state
         updateColorRGB();
         initTeamColors();
-        updateScoreboard();
+        updateScoreboard(true, 0);
 
         // Restore UI based on state
         if (currentState === STATE_PRE_RUN) {
@@ -1262,7 +1274,7 @@ document.addEventListener('keydown', (e) => {
             break;
         case '4':
             currentState = STATE_GAME_OVER;
-            updateScoreboard(); // Ensure final scores are counted
+            updateScoreboard(true, 0); // Ensure final scores are counted
             showGameoverPanel().then(() => recordGameEnd());
             break;
         case '5':
