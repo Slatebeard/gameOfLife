@@ -57,14 +57,21 @@ let debugTrailsOnly = false;
 let debugShowMetrics = false;
 let scheduleEnabled = false;
 
+// polling configuration
+const POLL_INTERVAL = 2000; // Poll server every 2 seconds
+const GRID_SEND_INTERVAL = 5000; // Send grid to server every 5 seconds
+let lastKnownAdminVersion = 0;
+
 // performance metrics
 let fpsCounter = 0;
 let lastFpsUpdate = 0;
 let currentFps = 0;
 
-// sync rate limiter
+// sync rate limiter for scores display
 const SYNC_RATE_LIMIT_MS = 60000;
 let lastSyncTs = 0;
+let pollTimer = null;
+let gridSendTimer = null;
 
 // game states
 const STATE_PRE_RUN = 'preRun';
@@ -79,13 +86,7 @@ const PHASE_TEAMS = 'teams';
 const PHASE_STATS = 'stats';
 const PHASE_READY = 'ready';
 
-// phase timing config (minutes from pregame start)
-const phaseTimings = {
-    [PHASE_PALETTE]: 0,    // immediate
-    [PHASE_TEAMS]: 10,     // +10 min
-    [PHASE_STATS]: 20,     // +20 min
-    [PHASE_READY]: 25      // +25 min = game start
-};
+// Note: Phase timing is now controlled by the server
 
 let currentPhase = PHASE_PALETTE;
 let pregameStartTime = null;
@@ -189,10 +190,9 @@ async function showGameoverPanel() {
         }
     }
 
-    // Switch to night palette for background
-    await assignNightPalette();
+    // Note: Night palette is now assigned server-side on gameOver transition
+    // The client will receive the updated palette via polling
 
-    gameOverStartTime = Date.now();
     if (panel) panel.classList.add('visible');
 }
 
@@ -213,12 +213,11 @@ function updateGameoverCountdown() {
     const seconds = Math.floor((remainingMs % 60000) / 1000);
     countdownTimeEl.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
 
-    if (remainingMs === 0) {
-        enterNightState();
-    }
+    // Note: Night state transition is now server-controlled via schedule
+    // The client will receive the state change via polling
 }
 
-async function enterNightState() {
+function enterNightVisuals() {
     hideGameoverPanel();
     hidePregamePanel();
 
@@ -226,12 +225,13 @@ async function enterNightState() {
     const headerBar = document.getElementById('header-bar');
     if (headerBar) headerBar.style.display = 'none';
 
-    // Clear canvas and load palette before starting night state
+    // Clear canvas before starting night visuals
     canvasContext.clearRect(0, 0, canvas.width, canvas.height);
-    await assignNightPalette();
 
-    currentState = STATE_NIGHT;
-    console.log('Entering night mode');
+    // Note: Night palette is now assigned server-side
+    // The client receives it via polling
+
+    console.log('Entering night mode visuals');
 }
 
 function exitNightState() {
@@ -344,23 +344,8 @@ function updatePregamePanel() {
     updateCountdown();
 }
 
-function getNextPhase() {
-    switch (currentPhase) {
-        case PHASE_PALETTE: return PHASE_TEAMS;
-        case PHASE_TEAMS: return PHASE_STATS;
-        case PHASE_STATS: return PHASE_READY;
-        default: return null;
-    }
-}
-
-function advancePhase() {
-    const nextPhase = getNextPhase();
-    if (nextPhase) {
-        currentPhase = nextPhase;
-        updateHeaderBarTeams();
-        updatePregamePanel();
-    }
-}
+// Note: Phase advancement is now server-controlled
+// The client just displays the current phase from the server
 
 function updateCountdown() {
     const countdownEl = document.getElementById('pregame-countdown');
@@ -369,101 +354,34 @@ function updateCountdown() {
 
     if (!countdownEl || !countdownTimeEl || !countdownLabelEl) return;
 
-    if (currentPhase === PHASE_READY) {
-        countdownLabelEl.textContent = 'Starting soon';
-        countdownTimeEl.textContent = '';
-        return;
-    }
-
-    const nextPhase = getNextPhase();
-    if (!nextPhase || !pregameStartTime) {
-        countdownEl.style.display = 'none';
-        return;
+    // Show phase status based on current phase (server-controlled)
+    switch (currentPhase) {
+        case PHASE_PALETTE:
+            countdownLabelEl.textContent = 'Waiting for teams...';
+            countdownTimeEl.textContent = '';
+            break;
+        case PHASE_TEAMS:
+            countdownLabelEl.textContent = 'Waiting for stats...';
+            countdownTimeEl.textContent = '';
+            break;
+        case PHASE_STATS:
+            countdownLabelEl.textContent = 'Getting ready...';
+            countdownTimeEl.textContent = '';
+            break;
+        case PHASE_READY:
+            countdownLabelEl.textContent = 'Starting soon';
+            countdownTimeEl.textContent = '';
+            break;
+        default:
+            countdownEl.style.display = 'none';
+            return;
     }
 
     countdownEl.style.display = 'flex';
-
-    const nextPhaseTime = pregameStartTime + (phaseTimings[nextPhase] * 60 * 1000);
-    const now = Date.now();
-    const remainingMs = Math.max(0, nextPhaseTime - now);
-
-    const minutes = Math.floor(remainingMs / 60000);
-    const seconds = Math.floor((remainingMs % 60000) / 1000);
-    const timeStr = `${minutes}:${seconds.toString().padStart(2, '0')}`;
-
-    switch (nextPhase) {
-        case PHASE_TEAMS:
-            countdownLabelEl.textContent = 'Teams reveal in';
-            break;
-        case PHASE_STATS:
-            countdownLabelEl.textContent = 'Stats reveal in';
-            break;
-        case PHASE_READY:
-            countdownLabelEl.textContent = 'Ready in';
-            break;
-    }
-
-    countdownTimeEl.textContent = timeStr;
-
-    if (remainingMs === 0) {
-        advancePhase();
-    }
 }
 
-async function assignRandomPalette() {
-    try {
-        const response = await fetch('/data/palettes.json');
-        const data = await response.json();
-
-        const paletteNames = Object.keys(data.palettes);
-        const randomName = paletteNames[Math.floor(Math.random() * paletteNames.length)];
-        const colors = data.palettes[randomName];
-
-        currentPaletteName = randomName;
-        isNightPalette = false;
-
-        for (let i = 0; i < 4; i++) {
-            teamColors[i + 1] = colors[i];
-        }
-
-        updateColorRGB();
-        initTeamColors();
-
-        console.log(`Palette: ${randomName}`);
-    } catch (error) {
-        console.error('Failed to load palette:', error);
-    }
-}
-
-async function assignNightPalette() {
-    if (isNightPalette) {
-        console.log(`Keeping night palette: ${currentPaletteName}`);
-        return;
-    }
-
-    try {
-        const response = await fetch('/data/palettes.json');
-        const data = await response.json();
-
-        const paletteNames = Object.keys(data.nightPalettes);
-        const randomName = paletteNames[Math.floor(Math.random() * paletteNames.length)];
-        const colors = data.nightPalettes[randomName];
-
-        currentPaletteName = randomName;
-        isNightPalette = true;
-
-        for (let i = 0; i < 4; i++) {
-            teamColors[i + 1] = colors[i];
-        }
-
-        updateColorRGB();
-        initTeamColors();
-
-        console.log(`Night Palette: ${randomName}`);
-    } catch (error) {
-        console.error('Failed to load night palette:', error);
-    }
-}
+// Note: Palette selection is now server-side. The client receives palette
+// from the server via polling and applies it directly.
 
 const teamCounts = [0, 0, 0, 0, 0];
 
@@ -582,33 +500,8 @@ function initTeamColors() {
 
 initTeamColors();
 
-async function assignRandomTeamNames() {
-    try {
-        const response = await fetch('/data/teamNames.json');
-        const data = await response.json();
-
-        const categoryKeys = Object.keys(data.categories);
-        const randomCategory = categoryKeys[Math.floor(Math.random() * categoryKeys.length)];
-        const names = data.categories[randomCategory];
-
-        currentCategoryName = randomCategory;
-
-        const shuffled = [...names].sort(() => Math.random() - 0.5);
-        const selectedNames = shuffled.slice(0, 4);
-
-        // Store actual names for later reveal
-        for (let i = 0; i < 4; i++) {
-            actualTeamNames[i] = selectedNames[i];
-        }
-
-        // Update header bar display based on current phase
-        updateHeaderBarTeams();
-
-        console.log(`Category: ${randomCategory}`);
-    } catch (error) {
-        console.error('Failed to load team names:', error);
-    }
-}
+// Note: Team name selection is now server-side. The client receives team names
+// from the server via polling and applies them directly.
 
 function updateHeaderBarTeams() {
     const teamsRevealed = currentPhase === PHASE_TEAMS || currentPhase === PHASE_STATS || currentPhase === PHASE_READY;
@@ -950,62 +843,157 @@ requestAnimationFrame(step);
 
 
 // ================================
-// 7. STATE PERSISTENCE
+// 7. SERVER POLLING (Display-Only Client)
 // ================================
 
-const STATE_VERSION = 1;
-const STATE_SAVE_INTERVAL = 5000; // 5 seconds
-const STATE_MAX_AGE = 24 * 60 * 60 * 1000;
-const SCHEDULE_CHECK_INTERVAL = 30000;
+// Poll the server for game state - server is the single source of truth
+async function pollServer() {
+    try {
+        const response = await fetch('/api/game');
+        const serverState = await response.json();
 
-let stateSaveTimer = null;
-let scheduleCheckTimer = null;
+        // Track admin version for logging
+        if (serverState.adminStateVersion !== lastKnownAdminVersion) {
+            console.log(`State update (v${lastKnownAdminVersion} -> v${serverState.adminStateVersion})`);
+            lastKnownAdminVersion = serverState.adminStateVersion;
+        }
 
-function collectGameState() {
-    return {
-        version: STATE_VERSION,
-        currentState: currentState,
-        currentPhase: currentPhase,
-        pregameStartTime: pregameStartTime,
-        gameOverStartTime: gameOverStartTime,
-        gridDimensions: { rows: rows, cols: cols },
-        grid: grid,
-        trailGrid: trailGrid,
-        teamColors: teamColors,
-        currentPaletteName: currentPaletteName,
-        currentCategoryName: currentCategoryName,
-        actualTeamNames: actualTeamNames,
-        teamCounts: teamCounts,
-        currentEvent: currentEvent,
-        spawnChance: spawnChance,
-        isNightPalette: isNightPalette
-    };
+        await applyServerState(serverState);
+    } catch (error) {
+        console.error('Failed to poll server:', error);
+    }
 }
 
-async function saveGameStateToServer() {
+// Send grid data to server (for backup/restore only)
+async function sendGridToServer() {
     try {
-        const state = collectGameState();
-        await fetch('/api/state', {
+        await fetch('/api/game/grid', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(state)
+            body: JSON.stringify({
+                grid: grid,
+                trailGrid: trailGrid,
+                teamCounts: [...teamCounts],
+                gridDimensions: { rows, cols },
+                currentEvent: currentEvent,
+                spawnChance: spawnChance,
+            })
         });
     } catch (error) {
-        console.error('Failed to save game state:', error);
+        console.error('Failed to send grid to server:', error);
     }
 }
 
-function scheduleSaveState() {
-    if (stateSaveTimer) {
-        clearInterval(stateSaveTimer);
+// Apply state received from server
+async function applyServerState(state) {
+    const prevState = currentState;
+    const prevPhase = currentPhase;
+
+    // Check if state changed
+    const stateChanged = state.currentState !== currentState;
+    const phaseChanged = state.currentPhase !== currentPhase;
+
+    // Apply core state from server
+    pregameStartTime = state.pregameStartTime;
+    gameOverStartTime = state.gameOverStartTime;
+
+    // Apply palette and team info from server
+    if (state.teamColors) teamColors = state.teamColors;
+    if (state.currentPaletteName) currentPaletteName = state.currentPaletteName;
+    if (state.currentCategoryName) currentCategoryName = state.currentCategoryName;
+    if (state.actualTeamNames) actualTeamNames = state.actualTeamNames;
+    if (state.isNightPalette !== undefined) isNightPalette = state.isNightPalette;
+    if (state.spawnChance !== undefined) spawnChance = state.spawnChance;
+
+    // Update derived state
+    updateColorRGB();
+    initTeamColors();
+
+    // Restore grid from server if available and dimensions match
+    if (state.grid && state.gridDimensions?.rows === rows && state.gridDimensions?.cols === cols) {
+        // Only restore if we don't have a grid yet (initial load)
+        if (!grid || grid.length === 0) {
+            grid = state.grid;
+            trailGrid = state.trailGrid || trailGrid;
+            if (state.teamCounts) {
+                for (let i = 0; i <= 4; i++) {
+                    teamCounts[i] = state.teamCounts[i] || 0;
+                }
+            }
+        }
     }
-    stateSaveTimer = setInterval(saveGameStateToServer, STATE_SAVE_INTERVAL);
+
+    // Handle state transitions
+    if (stateChanged || phaseChanged) {
+        currentState = state.currentState;
+        currentPhase = state.currentPhase;
+        await handleStateChange(state.currentState, prevState);
+    }
 }
 
-// ================================
-// 7b. AUTOMATIC SCHEDULE
-// ================================
+// Handle UI transitions based on state changes
+async function handleStateChange(newState, oldState) {
+    switch (newState) {
+        case STATE_PRE_RUN:
+            exitNightState();
+            hideGameoverPanel();
+            if (oldState !== STATE_PRE_RUN) {
+                resetGrid();
+            }
+            await fetchStats();
+            updatePregamePanel();
+            showPregamePanel();
+            updateHeaderBarTeams();
+            break;
+        case STATE_RUNNING:
+            exitNightState();
+            hidePregamePanel();
+            hideGameoverPanel();
+            updateHeaderBarTeams();
+            if (oldState === STATE_PRE_RUN) {
+                resetGrid();
+            }
+            break;
+        case STATE_GAME_OVER:
+            updateScoreboard(true, 0);
+            await showGameoverPanel();
+            if (oldState !== STATE_GAME_OVER) {
+                await recordGameEnd();
+            }
+            break;
+        case STATE_NIGHT:
+            hideGameoverPanel();
+            hidePregamePanel();
+            const headerBar = document.getElementById('header-bar');
+            if (headerBar) headerBar.style.display = 'none';
+            break;
+        case STATE_PAUSED:
+            hidePregamePanel();
+            hideGameoverPanel();
+            break;
+    }
 
+    // Update event display
+    updateEventDisplay();
+}
+
+function updateEventDisplay() {
+    const eventTextEl = document.getElementById('event-text');
+    if (eventTextEl) {
+        if (currentEvent === EVENT_COMETS) {
+            eventTextEl.textContent = 'COMETS!';
+            eventTextEl.classList.add('event-active');
+        } else if (currentEvent === EVENT_DROUGHT) {
+            eventTextEl.textContent = 'DROUGHT!';
+            eventTextEl.classList.add('event-active');
+        } else {
+            eventTextEl.textContent = 'NO EVENT';
+            eventTextEl.classList.remove('event-active');
+        }
+    }
+}
+
+// Toggle schedule via server
 async function toggleSchedule() {
     try {
         const response = await fetch('/api/schedule/toggle', {
@@ -1021,219 +1009,43 @@ async function toggleSchedule() {
     }
 }
 
+// Request game reset via admin API
 async function resetGameState() {
     try {
-        await fetch('/api/state', { method: 'DELETE' });
-        console.log('Game state cleared, reinitializing...');
-        // Reset night palette flag so a fresh palette is chosen
-        isNightPalette = false;
-        await enterPregameState();
+        await fetch('/api/control/reset', { method: 'POST' });
+        console.log('Game reset requested');
+        // Next poll will pick up the new state
     } catch (error) {
         console.error('Failed to reset game state:', error);
     }
 }
 
-async function checkSchedule() {
-    try {
-        const response = await fetch('/api/schedule');
-        const data = await response.json();
+// Start polling and grid sending
+function startPolling() {
+    if (pollTimer) clearInterval(pollTimer);
+    if (gridSendTimer) clearInterval(gridSendTimer);
 
-        // Sync local state
-        scheduleEnabled = data.enabled;
-
-        // Skip automatic transitions if schedule is disabled
-        if (!data.enabled) {
-            return;
-        }
-
-        const expected = data.expected;
-
-        // Check if state transition needed
-        if (expected.state !== currentState) {
-            console.log(`Schedule: transitioning ${currentState} -> ${expected.state}`);
-            await transitionToState(expected.state, expected.phase);
-        }
-        // Check if phase advance needed (within pregame)
-        else if (currentState === STATE_PRE_RUN && expected.phase !== currentPhase) {
-            const phaseOrder = ['palette', 'teams', 'stats', 'ready'];
-            const currentIdx = phaseOrder.indexOf(currentPhase);
-            const expectedIdx = phaseOrder.indexOf(expected.phase);
-            if (expectedIdx > currentIdx) {
-                console.log(`Schedule: advancing phase ${currentPhase} -> ${expected.phase}`);
-                while (currentPhase !== expected.phase && getNextPhase()) {
-                    advancePhase();
-                }
-            }
-        }
-    } catch (error) {
-        console.error('Failed to check schedule:', error);
-    }
-}
-
-async function transitionToState(targetState, targetPhase) {
-    switch (targetState) {
-        case 'preRun':
-            await enterPregameState();
-            // Advance to correct phase if needed
-            if (targetPhase) {
-                const phaseOrder = ['palette', 'teams', 'stats', 'ready'];
-                const targetIdx = phaseOrder.indexOf(targetPhase);
-                while (phaseOrder.indexOf(currentPhase) < targetIdx && getNextPhase()) {
-                    advancePhase();
-                }
-            }
-            break;
-        case 'running':
-            currentState = STATE_RUNNING;
-            currentPhase = PHASE_READY;
-            updateHeaderBarTeams();
-            hidePregamePanel();
-            hideGameoverPanel();
-            break;
-        case 'gameOver':
-            currentState = STATE_GAME_OVER;
-            updateScoreboard(true, 0);
-            await showGameoverPanel();
-            await recordGameEnd();
-            break;
-        case 'night':
-            await enterNightState();
-            break;
-    }
-}
-
-function startScheduleChecker() {
-    // Initial check
-    checkSchedule();
-    // Periodic checks
-    if (scheduleCheckTimer) {
-        clearInterval(scheduleCheckTimer);
-    }
-    scheduleCheckTimer = setInterval(checkSchedule, SCHEDULE_CHECK_INTERVAL);
-}
-
-async function restoreGameState() {
-    try {
-        const response = await fetch('/api/state');
-        if (response.status === 204) {
-            console.log('No saved state found, starting fresh');
-            return false;
-        }
-
-        const state = await response.json();
-
-        // Validate version
-        if (state.version !== STATE_VERSION) {
-            console.log('State version mismatch, starting fresh');
-            return false;
-        }
-
-        // Check for stale state (>24 hours)
-        if (state.savedAt) {
-            const savedTime = new Date(state.savedAt).getTime();
-            if (Date.now() - savedTime > STATE_MAX_AGE) {
-                console.log('State too old, starting fresh');
-                return false;
-            }
-        }
-
-        // Check grid dimensions match
-        if (state.gridDimensions.rows !== rows || state.gridDimensions.cols !== cols) {
-            console.log('Grid dimensions changed, starting fresh');
-            return false;
-        }
-
-        // Restore state variables
-        currentState = state.currentState;
-        currentPhase = state.currentPhase;
-        pregameStartTime = state.pregameStartTime;
-        gameOverStartTime = state.gameOverStartTime;
-        grid = state.grid;
-        trailGrid = state.trailGrid;
-        teamColors = state.teamColors;
-        currentPaletteName = state.currentPaletteName;
-        currentCategoryName = state.currentCategoryName;
-        actualTeamNames = state.actualTeamNames;
-        teamCounts[0] = state.teamCounts[0];
-        teamCounts[1] = state.teamCounts[1];
-        teamCounts[2] = state.teamCounts[2];
-        teamCounts[3] = state.teamCounts[3];
-        teamCounts[4] = state.teamCounts[4];
-        currentEvent = state.currentEvent;
-        spawnChance = state.spawnChance;
-        isNightPalette = state.isNightPalette || false;
-
-        // Update derived state
-        updateColorRGB();
-        initTeamColors();
-        updateScoreboard(true, 0);
-
-        // Restore UI based on state
-        if (currentState === STATE_PRE_RUN) {
-            fetchStats().then(() => {
-                updatePregamePanel();
-                showPregamePanel();
-            });
-            updateHeaderBarTeams();
-        } else if (currentState === STATE_GAME_OVER) {
-            showGameoverPanel();
-        } else if (currentState === STATE_NIGHT) {
-            const headerBar = document.getElementById('header-bar');
-            if (headerBar) headerBar.style.display = 'none';
-        } else {
-            // Running or paused
-            hidePregamePanel();
-            hideGameoverPanel();
-            updateHeaderBarTeams();
-        }
-
-        // Update event display
-        const eventTextEl = document.getElementById('event-text');
-        if (eventTextEl) {
-            if (currentEvent === EVENT_COMETS) {
-                eventTextEl.textContent = 'COMETS!';
-                eventTextEl.classList.add('event-active');
-            } else if (currentEvent === EVENT_DROUGHT) {
-                eventTextEl.textContent = 'DROUGHT!';
-                eventTextEl.classList.add('event-active');
-            } else {
-                eventTextEl.textContent = 'NO EVENT';
-                eventTextEl.classList.remove('event-active');
-            }
-        }
-
-        console.log(`Restored game state: ${currentState}`);
-        return true;
-    } catch (error) {
-        console.error('Failed to restore game state:', error);
-        return false;
-    }
+    pollTimer = setInterval(pollServer, POLL_INTERVAL);
+    gridSendTimer = setInterval(sendGridToServer, GRID_SEND_INTERVAL);
 }
 
 async function initialize() {
-    const restored = await restoreGameState();
-    if (!restored) {
-        // Check if schedule is enabled to determine initial state
-        try {
-            const response = await fetch('/api/schedule');
-            const data = await response.json();
-            if (data.enabled) {
-                await transitionToState(data.expected.state, data.expected.phase);
-            } else {
-                // Schedule disabled - start in pregame
-                await enterPregameState();
-            }
-        } catch (error) {
-            console.error('Failed to check schedule on init:', error);
-            await enterPregameState();
-        }
+    // Initial poll to get server state
+    await pollServer();
+
+    // If no grid from server, initialize fresh
+    if (!grid || grid.length === 0) {
+        resetGrid();
     }
-    scheduleSaveState();
-    startScheduleChecker();
+
+    // Start polling and grid sending
+    startPolling();
+
+    console.log('Client initialized - polling server for state');
 }
 
 // ================================
-// 8. KEYBINDS
+// 8. KEYBINDS (Debug/Local Only)
 // ================================
 
 const keybindsEl = document.getElementById('keybinds');
@@ -1243,44 +1055,15 @@ if (showKeybinds && keybindsEl) {
     keybindsEl.classList.add('visible');
 }
 
-async function enterPregameState() {
-    currentState = STATE_PRE_RUN;
-    currentPhase = PHASE_PALETTE;
-    pregameStartTime = Date.now();
-    exitNightState();
-    hideGameoverPanel();
-    await fetchStats();
-    await assignRandomPalette();
-    await assignRandomTeamNames();
-    resetGrid();
-    updatePregamePanel();
-    showPregamePanel();
-}
+// Note: State transitions are now server-controlled.
+// These keybinds are for local debug/events only.
 
 document.addEventListener('keydown', (e) => {
     switch (e.key) {
-        case '1':
-            enterPregameState();
-            break;
-        case '2':
-            currentState = STATE_RUNNING;
-            currentPhase = PHASE_READY; // Ensure teams are revealed when game starts
-            updateHeaderBarTeams();
-            hidePregamePanel();
-            hideGameoverPanel();
-            break;
-        case '3':
-            currentState = STATE_PAUSED;
-            break;
-        case '4':
-            currentState = STATE_GAME_OVER;
-            updateScoreboard(true, 0); // Ensure final scores are counted
-            showGameoverPanel().then(() => recordGameEnd());
-            break;
+        // Events (local only, sent to server via grid update)
         case '5':
             if (currentEvent === EVENT_COMETS) {
                 currentEvent = null;
-                currentState = STATE_RUNNING;
                 if (eventTextEl) {
                     eventTextEl.textContent = 'NO EVENT';
                     eventTextEl.classList.remove('event-active');
@@ -1313,14 +1096,6 @@ document.addEventListener('keydown', (e) => {
         case 'H':
             if (keybindsEl) keybindsEl.classList.toggle('visible');
             break;
-        case ']':
-            if (currentState === STATE_PRE_RUN) {
-                advancePhase();
-            }
-            break;
-        case '0':
-            enterNightState();
-            break;
         // Debug toggles
         case 't':
         case 'T':
@@ -1347,5 +1122,5 @@ document.addEventListener('keydown', (e) => {
     }
 });
 
-// Initialize - try to restore state, fall back to fresh pregame
+// Initialize - poll server for state, server is the single source of truth
 initialize();

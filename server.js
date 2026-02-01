@@ -3,13 +3,29 @@ import { serveStatic } from "@hono/node-server/serve-static";
 import { serve } from "@hono/node-server";
 import { getConnInfo } from "@hono/node-server/conninfo";
 import { readFileSync, writeFileSync, existsSync } from "fs";
+import { networkInterfaces } from "os";
+
+function getLocalIP() {
+  const nets = networkInterfaces();
+  for (const name of Object.keys(nets)) {
+    for (const net of nets[name]) {
+      // Skip internal and non-IPv4 addresses
+      if (net.family === "IPv4" && !net.internal) {
+        return net.address;
+      }
+    }
+  }
+  return "localhost";
+}
 
 const ACCESS_TOKEN = process.env.GAME_TOKEN || "life";
+const ADMIN_TOKEN = process.env.ADMIN_TOKEN || "admin";
 
 // ================================
 // DAILY SCHEDULE (24-hour format)
 // ================================
-let scheduleEnabled = true;
+let scheduleEnabled = false;
+let adminStateVersion = 0; // Increments on each admin action
 
 const SCHEDULE = {
   PREGAME_START: "08:45",
@@ -61,12 +77,108 @@ function getExpectedState() {
 
 const STATS_FILE = "./data/stats.json";
 const STATE_FILE = "./data/gameState.json";
+const PALETTES_FILE = "./public/data/palettes.json";
+const TEAM_NAMES_FILE = "./public/data/teamNames.json";
 
-let currentGameState = null;
+// ================================
+// SERVER-AUTHORITATIVE GAME STATE
+// ================================
+let gameState = {
+  currentState: "preRun",
+  currentPhase: "palette",
+  pregameStartTime: null,
+  gameOverStartTime: null,
+  teamColors: ["#000000", "#E63946", "#457B9D", "#2A9D8F", "#F4A261"],
+  currentPaletteName: "",
+  currentCategoryName: "",
+  actualTeamNames: ["", "", "", ""],
+  isNightPalette: false,
+  grid: null,
+  trailGrid: null,
+  teamCounts: [0, 0, 0, 0, 0],
+  gridDimensions: null,
+  currentEvent: null,
+  spawnChance: 0.0005,
+};
 
 let saveStateTimeout = null;
 const SAVE_DEBOUNCE_MS = 5000;
 
+// ================================
+// PALETTE AND TEAM NAME SELECTION
+// ================================
+function loadPalettes() {
+  try {
+    if (existsSync(PALETTES_FILE)) {
+      return JSON.parse(readFileSync(PALETTES_FILE, "utf-8"));
+    }
+  } catch (error) {
+    console.error("Failed to load palettes:", error);
+  }
+  return null;
+}
+
+function loadTeamNames() {
+  try {
+    if (existsSync(TEAM_NAMES_FILE)) {
+      return JSON.parse(readFileSync(TEAM_NAMES_FILE, "utf-8"));
+    }
+  } catch (error) {
+    console.error("Failed to load team names:", error);
+  }
+  return null;
+}
+
+function selectRandomPalette(isNight = false) {
+  const data = loadPalettes();
+  if (!data) {
+    console.warn("Using fallback palette");
+    gameState.currentPaletteName = "Fallback";
+    gameState.isNightPalette = isNight;
+    const fallbackColors = isNight
+      ? ["#1a1a2e", "#16213e", "#0f3460", "#e94560"]
+      : ["#E63946", "#457B9D", "#2A9D8F", "#F4A261"];
+    for (let i = 0; i < 4; i++) {
+      gameState.teamColors[i + 1] = fallbackColors[i];
+    }
+    return;
+  }
+
+  const palettes = isNight ? data.nightPalettes : data.palettes;
+  const paletteNames = Object.keys(palettes);
+  const randomName = paletteNames[Math.floor(Math.random() * paletteNames.length)];
+  const colors = palettes[randomName];
+
+  gameState.currentPaletteName = randomName;
+  gameState.isNightPalette = isNight;
+  for (let i = 0; i < 4; i++) {
+    gameState.teamColors[i + 1] = colors[i];
+  }
+  console.log(`[${new Date().toLocaleTimeString()}] Selected ${isNight ? "night " : ""}palette: ${randomName}`);
+}
+
+function selectRandomTeamNames() {
+  const data = loadTeamNames();
+  if (!data) {
+    console.warn("Using fallback team names");
+    gameState.currentCategoryName = "Fallback";
+    gameState.actualTeamNames = ["Alpha", "Beta", "Gamma", "Delta"];
+    return;
+  }
+
+  const categoryKeys = Object.keys(data.categories);
+  const randomCategory = categoryKeys[Math.floor(Math.random() * categoryKeys.length)];
+  const names = data.categories[randomCategory];
+
+  gameState.currentCategoryName = randomCategory;
+  const shuffled = [...names].sort(() => Math.random() - 0.5);
+  gameState.actualTeamNames = shuffled.slice(0, 4);
+  console.log(`[${new Date().toLocaleTimeString()}] Selected category: ${randomCategory} - Teams: ${gameState.actualTeamNames.join(", ")}`);
+}
+
+// ================================
+// STATE PERSISTENCE
+// ================================
 function loadGameState() {
   try {
     if (existsSync(STATE_FILE)) {
@@ -81,24 +193,28 @@ function loadGameState() {
   return null;
 }
 
-function saveGameState(state) {
+function saveGameState() {
   try {
-    writeFileSync(STATE_FILE, JSON.stringify(state));
+    const stateToSave = {
+      version: 1,
+      ...gameState,
+      savedAt: new Date().toISOString(),
+    };
+    writeFileSync(STATE_FILE, JSON.stringify(stateToSave));
   } catch (error) {
     console.error("Failed to save game state:", error);
   }
 }
 
-function formatStateLog(state) {
-  if (!state) return "null";
-  const scores = state.teamCounts
+function formatStateLog() {
+  const scores = gameState.teamCounts
     ?.slice(1)
     .map(
       (c, i) =>
-        `${state.actualTeamNames?.[i] || `Team ${i + 1}`}: ${c?.toLocaleString() || 0}`,
+        `${gameState.actualTeamNames?.[i] || `Team ${i + 1}`}: ${c?.toLocaleString() || 0}`,
     )
     .join(", ");
-  return `[${state.currentState}/${state.currentPhase}] ${scores}`;
+  return `[${gameState.currentState}/${gameState.currentPhase}] ${scores}`;
 }
 
 function debouncedSaveState() {
@@ -106,23 +222,128 @@ function debouncedSaveState() {
     clearTimeout(saveStateTimeout);
   }
   saveStateTimeout = setTimeout(() => {
-    if (currentGameState) {
-      saveGameState(currentGameState);
-      console.log(
-        `[${new Date().toLocaleTimeString()}] State saved to disk: ${formatStateLog(currentGameState)}`,
-      );
-    }
+    saveGameState();
+    console.log(
+      `[${new Date().toLocaleTimeString()}] State saved to disk: ${formatStateLog()}`,
+    );
   }, SAVE_DEBOUNCE_MS);
 }
 
-currentGameState = loadGameState();
-if (currentGameState) {
-  console.log(
-    `Loaded game state from disk: ${formatStateLog(currentGameState)}`,
-  );
-} else {
-  console.log("No saved state found, will start fresh");
+// ================================
+// STATE TRANSITIONS
+// ================================
+function transitionState(newState, newPhase) {
+  const oldState = gameState.currentState;
+  const oldPhase = gameState.currentPhase;
+
+  if (oldState === newState && oldPhase === newPhase) {
+    return;
+  }
+
+  console.log(`[${new Date().toLocaleTimeString()}] State transition: ${oldState}/${oldPhase} -> ${newState}/${newPhase}`);
+
+  gameState.currentState = newState;
+  if (newPhase !== undefined) {
+    gameState.currentPhase = newPhase;
+  }
+
+  switch (newState) {
+    case "preRun":
+      if (oldState !== "preRun") {
+        gameState.pregameStartTime = Date.now();
+        gameState.gameOverStartTime = null;
+        gameState.isNightPalette = false;
+        selectRandomPalette(false);
+        selectRandomTeamNames();
+        gameState.grid = null;
+        gameState.trailGrid = null;
+        gameState.teamCounts = [0, 0, 0, 0, 0];
+      }
+      break;
+    case "running":
+      gameState.currentPhase = "ready";
+      if (oldState === "preRun") {
+        gameState.grid = null;
+        gameState.trailGrid = null;
+        gameState.teamCounts = [0, 0, 0, 0, 0];
+      }
+      break;
+    case "gameOver":
+      gameState.gameOverStartTime = Date.now();
+      if (!gameState.isNightPalette) {
+        selectRandomPalette(true);
+      }
+      break;
+    case "night":
+      if (!gameState.isNightPalette) {
+        selectRandomPalette(true);
+      }
+      break;
+  }
+
+  adminStateVersion++;
+  debouncedSaveState();
 }
+
+// ================================
+// SERVER-SIDE SCHEDULE CHECKER
+// ================================
+function checkAndApplySchedule() {
+  if (!scheduleEnabled) return;
+
+  const expected = getExpectedState();
+
+  if (expected.state !== gameState.currentState) {
+    transitionState(expected.state, expected.phase);
+  } else if (gameState.currentState === "preRun" && expected.phase !== gameState.currentPhase) {
+    const phaseOrder = ["palette", "teams", "stats", "ready"];
+    const currentIdx = phaseOrder.indexOf(gameState.currentPhase);
+    const expectedIdx = phaseOrder.indexOf(expected.phase);
+    if (expectedIdx > currentIdx) {
+      console.log(`[${new Date().toLocaleTimeString()}] Schedule: advancing phase ${gameState.currentPhase} -> ${expected.phase}`);
+      gameState.currentPhase = expected.phase;
+      adminStateVersion++;
+      debouncedSaveState();
+    }
+  }
+}
+
+// Run schedule checker every 30 seconds
+setInterval(checkAndApplySchedule, 30000);
+
+// ================================
+// INITIALIZE SERVER STATE
+// ================================
+function initializeServerState() {
+  const savedState = loadGameState();
+  if (savedState) {
+    gameState = {
+      currentState: savedState.currentState || "preRun",
+      currentPhase: savedState.currentPhase || "palette",
+      pregameStartTime: savedState.pregameStartTime || null,
+      gameOverStartTime: savedState.gameOverStartTime || null,
+      teamColors: savedState.teamColors || ["#000000", "#E63946", "#457B9D", "#2A9D8F", "#F4A261"],
+      currentPaletteName: savedState.currentPaletteName || "",
+      currentCategoryName: savedState.currentCategoryName || "",
+      actualTeamNames: savedState.actualTeamNames || ["", "", "", ""],
+      isNightPalette: savedState.isNightPalette || false,
+      grid: savedState.grid || null,
+      trailGrid: savedState.trailGrid || null,
+      teamCounts: savedState.teamCounts || [0, 0, 0, 0, 0],
+      gridDimensions: savedState.gridDimensions || null,
+      currentEvent: savedState.currentEvent || null,
+      spawnChance: savedState.spawnChance || 0.0005,
+    };
+    console.log(`Loaded game state from disk: ${formatStateLog()}`);
+  } else {
+    console.log("No saved state found, initializing fresh pregame");
+    selectRandomPalette(false);
+    selectRandomTeamNames();
+    gameState.pregameStartTime = Date.now();
+  }
+}
+
+initializeServerState();
 
 function loadStats() {
   try {
@@ -164,6 +385,59 @@ let currentScores = {
   lastUpdated: null,
 };
 
+// ================================
+// NEW SERVER-AUTHORITATIVE ENDPOINTS
+// ================================
+
+// Client polls this for full game state
+app.get("/api/game", (c) => {
+  return c.json({
+    currentState: gameState.currentState,
+    currentPhase: gameState.currentPhase,
+    pregameStartTime: gameState.pregameStartTime,
+    gameOverStartTime: gameState.gameOverStartTime,
+    teamColors: gameState.teamColors,
+    currentPaletteName: gameState.currentPaletteName,
+    currentCategoryName: gameState.currentCategoryName,
+    actualTeamNames: gameState.actualTeamNames,
+    isNightPalette: gameState.isNightPalette,
+    grid: gameState.grid,
+    trailGrid: gameState.trailGrid,
+    teamCounts: gameState.teamCounts,
+    gridDimensions: gameState.gridDimensions,
+    currentEvent: gameState.currentEvent,
+    spawnChance: gameState.spawnChance,
+    adminStateVersion: adminStateVersion,
+  });
+});
+
+// Client sends grid data only (for backup/restore)
+app.post("/api/game/grid", async (c) => {
+  const body = await c.req.json();
+
+  // Only accept grid updates, not state changes
+  if (body.grid) gameState.grid = body.grid;
+  if (body.trailGrid) gameState.trailGrid = body.trailGrid;
+  if (body.teamCounts) gameState.teamCounts = body.teamCounts;
+  if (body.gridDimensions) gameState.gridDimensions = body.gridDimensions;
+  if (body.currentEvent !== undefined) gameState.currentEvent = body.currentEvent;
+  if (body.spawnChance !== undefined) gameState.spawnChance = body.spawnChance;
+
+  // Update scores display
+  currentScores = {
+    teams: gameState.actualTeamNames.map((name, i) => ({
+      name: name || `Team ${i + 1}`,
+      color: gameState.teamColors[i + 1],
+      count: gameState.teamCounts[i + 1] || 0,
+    })),
+    event: body.currentEvent || "NO EVENT",
+    lastUpdated: new Date().toISOString(),
+  };
+
+  debouncedSaveState();
+  return c.json({ success: true });
+});
+
 function isLocalhost(c) {
   const connInfo = getConnInfo(c);
   const ip = connInfo?.remote?.address || "";
@@ -178,6 +452,11 @@ function isLocalhost(c) {
 function hasValidToken(c) {
   const token = c.req.query("token");
   return token === ACCESS_TOKEN;
+}
+
+function hasValidAdminToken(c) {
+  const token = c.req.query("token");
+  return token === ADMIN_TOKEN;
 }
 
 app.post("/api/scores", async (c) => {
@@ -221,36 +500,113 @@ app.post("/api/schedule/toggle", async (c) => {
   return c.json({ enabled: scheduleEnabled });
 });
 
-app.get("/api/state", (c) => {
-  if (currentGameState) {
-    return c.json(currentGameState);
-  }
-  return c.body(null, 204);
+// ================================
+// ADMIN CONTROL ENDPOINTS
+// ================================
+
+app.get("/api/control/status", (c) => {
+  return c.json({
+    state: gameState.currentState,
+    phase: gameState.currentPhase,
+    scheduleEnabled: scheduleEnabled,
+    adminStateVersion: adminStateVersion,
+    teams: gameState.actualTeamNames,
+    palette: gameState.currentPaletteName,
+    category: gameState.currentCategoryName,
+    teamColors: gameState.teamColors,
+    teamCounts: gameState.teamCounts,
+    serverTime: new Date().toISOString(),
+  });
 });
 
-app.post("/api/state", async (c) => {
-  const body = await c.req.json();
-  const prevState = currentGameState?.currentState;
-  currentGameState = {
-    ...body,
-    savedAt: new Date().toISOString(),
+app.post("/api/control/reset", (c) => {
+  // Reset to fresh pregame with new palette and teams
+  gameState = {
+    currentState: "preRun",
+    currentPhase: "palette",
+    pregameStartTime: Date.now(),
+    gameOverStartTime: null,
+    teamColors: ["#000000", "#E63946", "#457B9D", "#2A9D8F", "#F4A261"],
+    currentPaletteName: "",
+    currentCategoryName: "",
+    actualTeamNames: ["", "", "", ""],
+    isNightPalette: false,
+    grid: null,
+    trailGrid: null,
+    teamCounts: [0, 0, 0, 0, 0],
+    gridDimensions: null,
+    currentEvent: null,
+    spawnChance: 0.0005,
   };
-  if (prevState !== currentGameState.currentState) {
-    console.log(
-      `[${new Date().toLocaleTimeString()}] State changed: ${prevState || "none"} → ${currentGameState.currentState}`,
-    );
-  }
+
+  selectRandomPalette(false);
+  selectRandomTeamNames();
+
+  scheduleEnabled = false;
+  adminStateVersion++;
   debouncedSaveState();
-  return c.json({ success: true });
+
+  console.log(`[${new Date().toLocaleTimeString()}] Admin: Game reset to fresh pregame (v${adminStateVersion})`);
+  return c.json({
+    success: true,
+    message: "Game reset with new palette and teams.",
+    adminStateVersion: adminStateVersion,
+  });
 });
 
-app.delete("/api/state", (c) => {
-  currentGameState = null;
-  if (existsSync(STATE_FILE)) {
-    writeFileSync(STATE_FILE, "{}");
+app.post("/api/control/advance", (c) => {
+  if (gameState.currentState !== "preRun") {
+    return c.json({ success: false, message: "Not in pregame state" }, 400);
   }
-  console.log(`[${new Date().toLocaleTimeString()}] Game state cleared`);
-  return c.json({ success: true });
+  const phaseOrder = ["palette", "teams", "stats", "ready"];
+  const currentIdx = phaseOrder.indexOf(gameState.currentPhase);
+  if (currentIdx < phaseOrder.length - 1) {
+    gameState.currentPhase = phaseOrder[currentIdx + 1];
+    adminStateVersion++;
+    debouncedSaveState();
+    console.log(
+      `[${new Date().toLocaleTimeString()}] Admin: Advanced to phase ${gameState.currentPhase} (v${adminStateVersion})`,
+    );
+    return c.json({
+      success: true,
+      phase: gameState.currentPhase,
+      adminStateVersion: adminStateVersion,
+    });
+  }
+  return c.json({ success: false, message: "Already at final phase" }, 400);
+});
+
+app.post("/api/control/start", (c) => {
+  scheduleEnabled = true;
+  transitionState("running", "ready");
+  console.log(
+    `[${new Date().toLocaleTimeString()}] Admin: Game started, schedule enabled (v${adminStateVersion})`,
+  );
+  return c.json({
+    success: true,
+    message: "Game started and schedule enabled",
+    scheduleEnabled: true,
+    adminStateVersion: adminStateVersion,
+  });
+});
+
+app.post("/api/control/set-state", async (c) => {
+  const body = await c.req.json();
+  const { state, phase } = body;
+  const validStates = ["preRun", "running", "paused", "gameOver", "night"];
+  if (!validStates.includes(state)) {
+    return c.json({ success: false, message: "Invalid state" }, 400);
+  }
+  transitionState(state, phase);
+  console.log(
+    `[${new Date().toLocaleTimeString()}] Admin: Set state to ${state}${phase ? `/${phase}` : ""} (v${adminStateVersion})`,
+  );
+  return c.json({
+    success: true,
+    state: state,
+    phase: phase || null,
+    adminStateVersion: adminStateVersion,
+  });
 });
 
 app.post("/api/game-end", async (c) => {
@@ -318,11 +674,19 @@ app.get("/score", (c) => {
   return c.html(html);
 });
 
+app.get("/admin", (c) => {
+  if (!isLocalhost(c) && !hasValidAdminToken(c)) {
+    return c.text("Access denied. Admin token required.", 403);
+  }
+  const html = readFileSync("./public/admin.html", "utf-8");
+  return c.html(html);
+});
+
 app.use("/*", async (c, next) => {
   const path = c.req.path;
 
-  // Allow /score and /api/ without token
-  if (path === "/score" || path.startsWith("/api/")) {
+  // Allow /score, /admin, and /api/ without game token
+  if (path === "/score" || path === "/admin" || path.startsWith("/api/")) {
     return next();
   }
 
@@ -357,8 +721,10 @@ app.use("/*", async (c, next) => {
 app.use("/*", serveStatic({ root: "./public" }));
 
 const port = 3000;
+const localIP = getLocalIP();
 console.log(`Server running at http://localhost:${port}`);
-console.log(`Kiosk access: http://<server-ip>:${port}/?token=${ACCESS_TOKEN}`);
+console.log(`Kiosk access: http://${localIP}:${port}/?token=${ACCESS_TOKEN}`);
+console.log(`Admin panel: http://${localIP}:${port}/admin?token=${ADMIN_TOKEN}`);
 
 serve({
   fetch: app.fetch,

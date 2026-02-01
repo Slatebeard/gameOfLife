@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+    <title>Game of Life - Admin Control Panel</title>
+    <style>
+        @font-face {
+            font-family: "NerdFont";
+            src: url("fonts/3270NerdFont-Regular.ttf") format("truetype");
+        }
+
+        :root {
+            --main-font: "NerdFont", system-ui, -apple-system, sans-serif;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        html,
+        body {
+            font-family: var(--main-font);
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 100%);
+            min-height: 100vh;
+            color: #fff;
+        }
+
+        .container {
+            max-width: 500px;
+            margin: 0 auto;
+            padding: 16px;
+        }
+
+        header {
+            text-align: center;
+            padding: 16px 0 20px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            margin-bottom: 16px;
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            font-weight: bold;
+            margin-bottom: 4px;
+        }
+
+        .subtitle {
+            font-size: 0.85rem;
+            opacity: 0.6;
+        }
+
+        .status-card {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 16px;
+        }
+
+        .status-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .status-row:last-child {
+            border-bottom: none;
+        }
+
+        .status-label {
+            font-size: 0.85rem;
+            opacity: 0.6;
+        }
+
+        .status-value {
+            font-size: 0.95rem;
+            font-weight: bold;
+        }
+
+        .status-value.state-preRun { color: #f4a261; }
+        .status-value.state-running { color: #2a9d8f; }
+        .status-value.state-paused { color: #e9c46a; }
+        .status-value.state-gameOver { color: #e63946; }
+        .status-value.state-night { color: #457b9d; }
+        .status-value.schedule-on { color: #2a9d8f; }
+        .status-value.schedule-off { color: #e63946; }
+
+        .section-title {
+            font-size: 0.85rem;
+            opacity: 0.5;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin: 20px 0 12px;
+        }
+
+        .button-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        .button-grid.single {
+            grid-template-columns: 1fr;
+        }
+
+        button {
+            font-family: var(--main-font);
+            font-size: 1rem;
+            font-weight: bold;
+            padding: 18px 16px;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: transform 0.1s, opacity 0.2s;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        button:active {
+            transform: scale(0.97);
+        }
+
+        button:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-reset {
+            background: linear-gradient(135deg, #e63946 0%, #c1121f 100%);
+            color: white;
+        }
+
+        .btn-advance {
+            background: linear-gradient(135deg, #f4a261 0%, #e76f51 100%);
+            color: white;
+        }
+
+        .btn-start {
+            background: linear-gradient(135deg, #2a9d8f 0%, #1a7f74 100%);
+            color: white;
+            grid-column: span 2;
+        }
+
+        .btn-pause {
+            background: linear-gradient(135deg, #e9c46a 0%, #d4a533 100%);
+            color: #1a1a2e;
+        }
+
+        .btn-resume {
+            background: linear-gradient(135deg, #2a9d8f 0%, #1a7f74 100%);
+            color: white;
+        }
+
+        .btn-end {
+            background: linear-gradient(135deg, #e63946 0%, #c1121f 100%);
+            color: white;
+        }
+
+        .btn-schedule {
+            background: linear-gradient(135deg, #457b9d 0%, #1d3557 100%);
+            color: white;
+            grid-column: span 2;
+        }
+
+        .btn-night {
+            background: linear-gradient(135deg, #1a1a2e 0%, #0a0a0a 100%);
+            color: #457b9d;
+            border: 1px solid #457b9d;
+        }
+
+        .teams-preview {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-top: 12px;
+        }
+
+        .team-chip {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            font-size: 0.85rem;
+        }
+
+        .team-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+
+        .team-name {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .message {
+            text-align: center;
+            padding: 12px;
+            margin: 12px 0;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .message.visible {
+            opacity: 1;
+        }
+
+        .message.success {
+            background: rgba(42, 157, 143, 0.2);
+            color: #2a9d8f;
+        }
+
+        .message.error {
+            background: rgba(230, 57, 70, 0.2);
+            color: #e63946;
+        }
+
+        .last-updated {
+            text-align: center;
+            padding: 16px 0;
+            font-size: 0.75rem;
+            opacity: 0.3;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <h1>Admin Control</h1>
+            <div class="subtitle">Game of Life</div>
+        </header>
+
+        <div class="status-card">
+            <div class="status-row">
+                <span class="status-label">State</span>
+                <span id="status-state" class="status-value">---</span>
+            </div>
+            <div class="status-row">
+                <span class="status-label">Phase</span>
+                <span id="status-phase" class="status-value">---</span>
+            </div>
+            <div class="status-row">
+                <span class="status-label">Schedule</span>
+                <span id="status-schedule" class="status-value">---</span>
+            </div>
+            <div class="status-row">
+                <span class="status-label">Palette</span>
+                <span id="status-palette" class="status-value">---</span>
+            </div>
+        </div>
+
+        <div id="teams-section">
+            <div class="section-title">Teams</div>
+            <div id="teams-preview" class="teams-preview"></div>
+        </div>
+
+        <div id="message" class="message"></div>
+
+        <div class="section-title">Pregame Controls</div>
+        <div class="button-grid">
+            <button id="btn-reset" class="btn-reset">Reset Game</button>
+            <button id="btn-advance" class="btn-advance">Advance Phase</button>
+        </div>
+
+        <div class="section-title">Game Controls</div>
+        <div class="button-grid single">
+            <button id="btn-start" class="btn-start">Start Game</button>
+        </div>
+        <div class="button-grid" style="margin-top: 12px;">
+            <button id="btn-pause" class="btn-pause">Pause</button>
+            <button id="btn-end" class="btn-end">End Game</button>
+        </div>
+
+        <div class="section-title">Schedule</div>
+        <div class="button-grid single">
+            <button id="btn-schedule" class="btn-schedule">Toggle Schedule</button>
+        </div>
+
+        <div class="section-title">Other</div>
+        <div class="button-grid single">
+            <button id="btn-night" class="btn-night">Enter Night Mode</button>
+        </div>
+
+        <div id="last-updated" class="last-updated"></div>
+    </div>
+
+    <script>
+        let currentStatus = null;
+
+        async function fetchStatus() {
+            try {
+                const response = await fetch('/api/control/status');
+                currentStatus = await response.json();
+                renderStatus(currentStatus);
+            } catch (error) {
+                console.error('Failed to fetch status:', error);
+            }
+        }
+
+        function renderStatus(status) {
+            const stateEl = document.getElementById('status-state');
+            const phaseEl = document.getElementById('status-phase');
+            const scheduleEl = document.getElementById('status-schedule');
+            const paletteEl = document.getElementById('status-palette');
+            const teamsEl = document.getElementById('teams-preview');
+            const lastUpdatedEl = document.getElementById('last-updated');
+
+            // State
+            const stateLabels = {
+                preRun: 'Pregame',
+                running: 'Running',
+                paused: 'Paused',
+                gameOver: 'Game Over',
+                night: 'Night Mode',
+                unknown: 'Unknown'
+            };
+            stateEl.textContent = stateLabels[status.state] || status.state;
+            stateEl.className = 'status-value state-' + status.state;
+
+            // Phase
+            const phaseLabels = {
+                palette: 'Colors Only',
+                teams: 'Teams Revealed',
+                stats: 'Stats Revealed',
+                ready: 'Ready'
+            };
+            phaseEl.textContent = status.phase ? (phaseLabels[status.phase] || status.phase) : '-';
+
+            // Schedule
+            scheduleEl.textContent = status.scheduleEnabled ? 'Enabled' : 'Disabled';
+            scheduleEl.className = 'status-value schedule-' + (status.scheduleEnabled ? 'on' : 'off');
+
+            // Palette
+            paletteEl.textContent = status.palette || '-';
+
+            // Teams
+            if (status.teams && status.teams.length > 0 && status.teams[0]) {
+                teamsEl.innerHTML = status.teams.map((name, i) => {
+                    const color = status.teamColors?.[i + 1] || '#888';
+                    return `
+                        <div class="team-chip">
+                            <div class="team-dot" style="background-color: ${color}"></div>
+                            <span class="team-name">${escapeHtml(name || '???')}</span>
+                        </div>
+                    `;
+                }).join('');
+            } else {
+                teamsEl.innerHTML = '<div class="team-chip" style="grid-column: span 2; opacity: 0.5;">No teams loaded</div>';
+            }
+
+            // Update button states
+            updateButtonStates(status);
+
+            // Last updated
+            if (status.serverTime) {
+                const date = new Date(status.serverTime);
+                lastUpdatedEl.textContent = 'Updated: ' + date.toLocaleTimeString();
+            }
+        }
+
+        function updateButtonStates(status) {
+            const btnAdvance = document.getElementById('btn-advance');
+            const btnStart = document.getElementById('btn-start');
+            const btnPause = document.getElementById('btn-pause');
+            const btnEnd = document.getElementById('btn-end');
+            const btnSchedule = document.getElementById('btn-schedule');
+
+            // Advance only works in pregame
+            btnAdvance.disabled = status.state !== 'preRun' || status.phase === 'ready';
+            if (status.state === 'preRun') {
+                const nextPhase = getNextPhaseLabel(status.phase);
+                btnAdvance.textContent = nextPhase ? `Reveal ${nextPhase}` : 'Ready';
+            } else {
+                btnAdvance.textContent = 'Advance Phase';
+            }
+
+            // Start only works if not already running
+            btnStart.disabled = status.state === 'running';
+
+            // Pause toggles based on state
+            if (status.state === 'paused') {
+                btnPause.textContent = 'Resume';
+                btnPause.className = 'btn-resume';
+            } else {
+                btnPause.textContent = 'Pause';
+                btnPause.className = 'btn-pause';
+            }
+            btnPause.disabled = status.state !== 'running' && status.state !== 'paused';
+
+            // End only works when running
+            btnEnd.disabled = status.state !== 'running' && status.state !== 'paused';
+
+            // Schedule toggle
+            btnSchedule.textContent = status.scheduleEnabled ? 'Disable Schedule' : 'Enable Schedule';
+        }
+
+        function getNextPhaseLabel(currentPhase) {
+            switch (currentPhase) {
+                case 'palette': return 'Teams';
+                case 'teams': return 'Stats';
+                case 'stats': return null;
+                default: return null;
+            }
+        }
+
+        function showMessage(text, type) {
+            const msgEl = document.getElementById('message');
+            msgEl.textContent = text;
+            msgEl.className = 'message visible ' + type;
+            setTimeout(() => {
+                msgEl.classList.remove('visible');
+            }, 3000);
+        }
+
+        async function apiCall(endpoint, options = {}) {
+            try {
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    ...options
+                });
+                const data = await response.json();
+                if (data.success) {
+                    showMessage(data.message || 'Success', 'success');
+                } else {
+                    showMessage(data.message || 'Failed', 'error');
+                }
+                // Refresh status
+                setTimeout(fetchStatus, 500);
+                return data;
+            } catch (error) {
+                showMessage('Request failed', 'error');
+                console.error('API call failed:', error);
+            }
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Button handlers
+        document.getElementById('btn-reset').addEventListener('click', () => {
+            if (confirm('Reset the game? This will clear all state and start fresh pregame.')) {
+                apiCall('/api/control/reset');
+            }
+        });
+
+        document.getElementById('btn-advance').addEventListener('click', () => {
+            apiCall('/api/control/advance');
+        });
+
+        document.getElementById('btn-start').addEventListener('click', () => {
+            apiCall('/api/control/start');
+        });
+
+        document.getElementById('btn-pause').addEventListener('click', () => {
+            const newState = currentStatus?.state === 'paused' ? 'running' : 'paused';
+            apiCall('/api/control/set-state', {
+                body: JSON.stringify({ state: newState })
+            });
+        });
+
+        document.getElementById('btn-end').addEventListener('click', () => {
+            if (confirm('End the game now?')) {
+                apiCall('/api/control/set-state', {
+                    body: JSON.stringify({ state: 'gameOver' })
+                });
+            }
+        });
+
+        document.getElementById('btn-schedule').addEventListener('click', () => {
+            fetch('/api/schedule/toggle', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({})
+            }).then(response => response.json())
+              .then(data => {
+                  showMessage('Schedule ' + (data.enabled ? 'enabled' : 'disabled'), 'success');
+                  setTimeout(fetchStatus, 500);
+              });
+        });
+
+        document.getElementById('btn-night').addEventListener('click', () => {
+            apiCall('/api/control/set-state', {
+                body: JSON.stringify({ state: 'night' })
+            });
+        });
+
+        // Initial fetch and auto-refresh
+        fetchStatus();
+        setInterval(fetchStatus, 2000);
+    </script>
+</body>
+
+</html>
