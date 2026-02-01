@@ -138,6 +138,8 @@ let colorRGB = teamColors.map(hexToRGB);
 
 function updateColorRGB() {
     colorRGB = teamColors.map(hexToRGB);
+    // Ensure dead cell color is always pure black
+    colorRGB[0] = [0, 0, 0];
 }
 
 function equalizeTeamLabelWidths() {
@@ -580,6 +582,10 @@ updateScoreboard(true, 0);
 // ================================
 
 function drawGrid() {
+    // Fill background with black first (don't rely on CSS body showing through)
+    canvasContext.fillStyle = '#000000';
+    canvasContext.fillRect(0, 0, canvas.width, canvas.height);
+
     for (let row = 0; row < trailGrid.length; row++) {
         for (let col = 0; col < trailGrid[row].length; col++) {
             const { color, brightness } = trailGrid[row][col];
@@ -592,7 +598,7 @@ function drawGrid() {
             if (!debugShowTrails && brightness < 1) continue;
 
             const [r, g, b] = colorRGB[color];
-            canvasContext.fillStyle = `rgba(${r * brightness}, ${g * brightness}, ${b * brightness}, ${brightness})`;
+            canvasContext.fillStyle = `rgb(${Math.round(r * brightness)}, ${Math.round(g * brightness)}, ${Math.round(b * brightness)})`;
             canvasContext.fillRect(
                 col * cellSize,
                 row * cellSize,
@@ -611,7 +617,12 @@ function updateTrail() {
                 trailGrid[row][col].color = cell;
                 trailGrid[row][col].brightness = 1;
             } else {
-                trailGrid[row][col].brightness = Math.max(0, trailGrid[row][col].brightness - trailFade);
+                const newBrightness = Math.max(0, trailGrid[row][col].brightness - trailFade);
+                trailGrid[row][col].brightness = newBrightness;
+                // Reset color to black when fully faded
+                if (newBrightness === 0) {
+                    trailGrid[row][col].color = 0;
+                }
             }
         }
     }
