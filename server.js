@@ -9,7 +9,6 @@ function getLocalIP() {
   const nets = networkInterfaces();
   for (const name of Object.keys(nets)) {
     for (const net of nets[name]) {
-      // Skip internal and non-IPv4 addresses
       if (net.family === "IPv4" && !net.internal) {
         return net.address;
       }
@@ -308,7 +307,6 @@ function checkAndApplySchedule() {
   }
 }
 
-// Run schedule checker every 30 seconds
 setInterval(checkAndApplySchedule, 30000);
 
 // ================================
@@ -389,9 +387,10 @@ let currentScores = {
 // NEW SERVER-AUTHORITATIVE ENDPOINTS
 // ================================
 
-// Client polls this for full game state
 app.get("/api/game", (c) => {
-  return c.json({
+  const includeGrid = c.req.query("includeGrid") === "true";
+
+  const response = {
     currentState: gameState.currentState,
     currentPhase: gameState.currentPhase,
     pregameStartTime: gameState.pregameStartTime,
@@ -401,17 +400,21 @@ app.get("/api/game", (c) => {
     currentCategoryName: gameState.currentCategoryName,
     actualTeamNames: gameState.actualTeamNames,
     isNightPalette: gameState.isNightPalette,
-    grid: gameState.grid,
-    trailGrid: gameState.trailGrid,
     teamCounts: gameState.teamCounts,
     gridDimensions: gameState.gridDimensions,
     currentEvent: gameState.currentEvent,
     spawnChance: gameState.spawnChance,
     adminStateVersion: adminStateVersion,
-  });
+  };
+
+  if (includeGrid) {
+    response.grid = gameState.grid;
+    response.trailGrid = gameState.trailGrid;
+  }
+
+  return c.json(response);
 });
 
-// Client sends grid data only (for backup/restore)
 app.post("/api/game/grid", async (c) => {
   const body = await c.req.json();
 
@@ -423,7 +426,6 @@ app.post("/api/game/grid", async (c) => {
   if (body.currentEvent !== undefined) gameState.currentEvent = body.currentEvent;
   if (body.spawnChance !== undefined) gameState.spawnChance = body.spawnChance;
 
-  // Update scores display
   currentScores = {
     teams: gameState.actualTeamNames.map((name, i) => ({
       name: name || `Team ${i + 1}`,
@@ -520,7 +522,6 @@ app.get("/api/control/status", (c) => {
 });
 
 app.post("/api/control/reset", (c) => {
-  // Reset to fresh pregame with new palette and teams
   gameState = {
     currentState: "preRun",
     currentPhase: "palette",
@@ -685,7 +686,6 @@ app.get("/admin", (c) => {
 app.use("/*", async (c, next) => {
   const path = c.req.path;
 
-  // Allow /score, /admin, and /api/ without game token
   if (path === "/score" || path === "/admin" || path.startsWith("/api/")) {
     return next();
   }

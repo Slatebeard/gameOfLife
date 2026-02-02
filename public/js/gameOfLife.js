@@ -58,9 +58,10 @@ let debugShowMetrics = false;
 let scheduleEnabled = false;
 
 // polling configuration
-const POLL_INTERVAL = 2000; // Poll server every 2 seconds
-const GRID_SEND_INTERVAL = 5000; // Send grid to server every 5 seconds
+const POLL_INTERVAL = 10000;
+const GRID_SEND_INTERVAL = 60000;
 let lastKnownAdminVersion = 0;
+let isInitialLoad = true;
 
 // performance metrics
 let fpsCounter = 0;
@@ -68,7 +69,7 @@ let lastFpsUpdate = 0;
 let currentFps = 0;
 
 // sync rate limiter for scores display
-const SYNC_RATE_LIMIT_MS = 60000;
+const SYNC_RATE_LIMIT_MS = 120000;
 let lastSyncTs = 0;
 let pollTimer = null;
 let gridSendTimer = null;
@@ -86,12 +87,11 @@ const PHASE_TEAMS = 'teams';
 const PHASE_STATS = 'stats';
 const PHASE_READY = 'ready';
 
-// Note: Phase timing is now controlled by the server
 
 let currentPhase = PHASE_PALETTE;
 let pregameStartTime = null;
 let gameOverStartTime = null;
-const NIGHT_MODE_DELAY = 10 * 60 * 1000; // 10 minutes in ms
+const NIGHT_MODE_DELAY = 10 * 60 * 1000;
 
 
 // event states
@@ -103,7 +103,7 @@ const cometMinRadius = 3;
 const cometMaxRadius = 12;
 
 
-const cometSpawnInterval = Math.floor(Math.random() * 12) + 2; // spawn every 2-10 frames
+const cometSpawnInterval = Math.floor(Math.random() * 12) + 2;
 
 let currentState = STATE_PRE_RUN;
 let currentEvent = null;
@@ -192,8 +192,6 @@ async function showGameoverPanel() {
         }
     }
 
-    // Note: Night palette is now assigned server-side on gameOver transition
-    // The client will receive the updated palette via polling
 
     if (panel) panel.classList.add('visible');
 }
@@ -215,23 +213,17 @@ function updateGameoverCountdown() {
     const seconds = Math.floor((remainingMs % 60000) / 1000);
     countdownTimeEl.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
 
-    // Note: Night state transition is now server-controlled via schedule
-    // The client will receive the state change via polling
 }
 
 function enterNightVisuals() {
     hideGameoverPanel();
     hidePregamePanel();
 
-    // Hide header bar
     const headerBar = document.getElementById('header-bar');
     if (headerBar) headerBar.style.display = 'none';
 
-    // Clear canvas before starting night visuals
     canvasContext.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Note: Night palette is now assigned server-side
-    // The client receives it via polling
 
     console.log('Entering night mode visuals');
 }
@@ -346,8 +338,6 @@ function updatePregamePanel() {
     updateCountdown();
 }
 
-// Note: Phase advancement is now server-controlled
-// The client just displays the current phase from the server
 
 function updateCountdown() {
     const countdownEl = document.getElementById('pregame-countdown');
@@ -382,8 +372,6 @@ function updateCountdown() {
     countdownEl.style.display = 'flex';
 }
 
-// Note: Palette selection is now server-side. The client receives palette
-// from the server via polling and applies it directly.
 
 const teamCounts = [0, 0, 0, 0, 0];
 
@@ -502,8 +490,6 @@ function initTeamColors() {
 
 initTeamColors();
 
-// Note: Team name selection is now server-side. The client receives team names
-// from the server via polling and applies them directly.
 
 function updateHeaderBarTeams() {
     const teamsRevealed = currentPhase === PHASE_TEAMS || currentPhase === PHASE_STATS || currentPhase === PHASE_READY;
@@ -573,9 +559,6 @@ function resetGrid() {
     drawGrid();
 }
 
-resetGrid();
-
-updateScoreboard(true, 0);
 
 // ================================
 // 4. DRAW
@@ -660,9 +643,6 @@ function updateMetricsPanel(currentTime) {
         panel.classList.remove('visible');
     }
 }
-
-drawGrid();
-
 
 // ================================
 // 5. EVENTS
@@ -780,11 +760,11 @@ let frameCount = 0;
 function step(currentTime) {
     requestAnimationFrame(step);
 
-    // Clock and metrics always update regardless of state
     updateClock();
     updateMetricsPanel(currentTime);
 
-    // Game over shows night mode simulation behind the winner panel
+    if (!grid || grid.length === 0) return;
+
     if (currentState === STATE_GAME_OVER) {
         if (currentTime - lastFrameTime < frameInterval) {
             updateGameoverCountdown();
@@ -857,13 +837,12 @@ requestAnimationFrame(step);
 // 7. SERVER POLLING (Display-Only Client)
 // ================================
 
-// Poll the server for game state - server is the single source of truth
-async function pollServer() {
+async function pollServer(includeGrid = false) {
     try {
-        const response = await fetch('/api/game');
+        const url = includeGrid ? '/api/game?includeGrid=true' : '/api/game';
+        const response = await fetch(url);
         const serverState = await response.json();
 
-        // Track admin version for logging
         if (serverState.adminStateVersion !== lastKnownAdminVersion) {
             console.log(`State update (v${lastKnownAdminVersion} -> v${serverState.adminStateVersion})`);
             lastKnownAdminVersion = serverState.adminStateVersion;
@@ -875,7 +854,6 @@ async function pollServer() {
     }
 }
 
-// Send grid data to server (for backup/restore only)
 async function sendGridToServer() {
     try {
         await fetch('/api/game/grid', {
@@ -895,20 +873,16 @@ async function sendGridToServer() {
     }
 }
 
-// Apply state received from server
 async function applyServerState(state) {
     const prevState = currentState;
     const prevPhase = currentPhase;
 
-    // Check if state changed
     const stateChanged = state.currentState !== currentState;
     const phaseChanged = state.currentPhase !== currentPhase;
 
-    // Apply core state from server
     pregameStartTime = state.pregameStartTime;
     gameOverStartTime = state.gameOverStartTime;
 
-    // Apply palette and team info from server
     if (state.teamColors) teamColors = state.teamColors;
     if (state.currentPaletteName) currentPaletteName = state.currentPaletteName;
     if (state.currentCategoryName) currentCategoryName = state.currentCategoryName;
@@ -916,39 +890,51 @@ async function applyServerState(state) {
     if (state.isNightPalette !== undefined) isNightPalette = state.isNightPalette;
     if (state.spawnChance !== undefined) spawnChance = state.spawnChance;
 
-    // Update derived state
     updateColorRGB();
     initTeamColors();
 
-    // Restore grid from server if available and dimensions match
-    if (state.grid && state.gridDimensions?.rows === rows && state.gridDimensions?.cols === cols) {
-        // Only restore if we don't have a grid yet (initial load)
-        if (!grid || grid.length === 0) {
-            grid = state.grid;
-            trailGrid = state.trailGrid || trailGrid;
-            if (state.teamCounts) {
-                for (let i = 0; i <= 4; i++) {
-                    teamCounts[i] = state.teamCounts[i] || 0;
-                }
-            }
-        }
-    }
-
-    // Handle state transitions
     if (stateChanged || phaseChanged) {
         currentState = state.currentState;
         currentPhase = state.currentPhase;
         await handleStateChange(state.currentState, prevState);
     }
+
+    if (isInitialLoad && state.grid && state.gridDimensions?.rows === rows && state.gridDimensions?.cols === cols) {
+        grid = state.grid;
+
+        gridBuffer = [];
+        for (let r = 0; r < grid.length; r++) {
+            gridBuffer.push(new Array(grid[r].length).fill(0));
+        }
+
+        if (state.trailGrid && state.trailGrid.length > 0) {
+            trailGrid = state.trailGrid;
+        } else {
+            trailGrid = [];
+            for (let r = 0; r < grid.length; r++) {
+                const row = [];
+                for (let c = 0; c < grid[r].length; c++) {
+                    const cell = grid[r][c];
+                    row.push({ color: cell, brightness: cell > 0 ? 1 : 0 });
+                }
+                trailGrid.push(row);
+            }
+        }
+        if (state.teamCounts) {
+            for (let i = 0; i <= 4; i++) {
+                teamCounts[i] = state.teamCounts[i] || 0;
+            }
+        }
+        console.log('Grid restored from server');
+    }
 }
 
-// Handle UI transitions based on state changes
 async function handleStateChange(newState, oldState) {
     switch (newState) {
         case STATE_PRE_RUN:
             exitNightState();
             hideGameoverPanel();
-            if (oldState !== STATE_PRE_RUN) {
+            if (oldState !== STATE_PRE_RUN && !isInitialLoad) {
                 resetGrid();
             }
             await fetchStats();
@@ -961,7 +947,7 @@ async function handleStateChange(newState, oldState) {
             hidePregamePanel();
             hideGameoverPanel();
             updateHeaderBarTeams();
-            if (oldState === STATE_PRE_RUN) {
+            if (oldState === STATE_PRE_RUN && !isInitialLoad) {
                 resetGrid();
             }
             break;
@@ -984,7 +970,6 @@ async function handleStateChange(newState, oldState) {
             break;
     }
 
-    // Update event display
     updateEventDisplay();
 }
 
@@ -1004,7 +989,6 @@ function updateEventDisplay() {
     }
 }
 
-// Toggle schedule via server
 async function toggleSchedule() {
     try {
         const response = await fetch('/api/schedule/toggle', {
@@ -1020,7 +1004,6 @@ async function toggleSchedule() {
     }
 }
 
-// Request game reset via admin API
 async function resetGameState() {
     try {
         await fetch('/api/control/reset', { method: 'POST' });
@@ -1031,7 +1014,6 @@ async function resetGameState() {
     }
 }
 
-// Start polling and grid sending
 function startPolling() {
     if (pollTimer) clearInterval(pollTimer);
     if (gridSendTimer) clearInterval(gridSendTimer);
@@ -1041,15 +1023,14 @@ function startPolling() {
 }
 
 async function initialize() {
-    // Initial poll to get server state
-    await pollServer();
+    await pollServer(true);
 
-    // If no grid from server, initialize fresh
     if (!grid || grid.length === 0) {
         resetGrid();
     }
 
-    // Start polling and grid sending
+    isInitialLoad = false;
+
     startPolling();
 
     console.log('Client initialized - polling server for state');
@@ -1066,12 +1047,9 @@ if (showKeybinds && keybindsEl) {
     keybindsEl.classList.add('visible');
 }
 
-// Note: State transitions are now server-controlled.
-// These keybinds are for local debug/events only.
 
 document.addEventListener('keydown', (e) => {
     switch (e.key) {
-        // Events (local only, sent to server via grid update)
         case '5':
             if (currentEvent === EVENT_COMETS) {
                 currentEvent = null;
@@ -1133,5 +1111,4 @@ document.addEventListener('keydown', (e) => {
     }
 });
 
-// Initialize - poll server for state, server is the single source of truth
 initialize();
