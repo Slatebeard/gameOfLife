@@ -36,7 +36,7 @@ canvasContext.imageSmoothingEnabled = false;
 const imageData = canvasContext.createImageData(cols, rows);
 const pixels32 = new Uint32Array(imageData.data.buffer);
 
-const BRIGHTNESS_LEVELS = 101;
+const BRIGHTNESS_LEVELS = 201; // 0-200 scale for slower fade
 let colorCache32 = [];
 
 function buildColorCache() {
@@ -45,7 +45,7 @@ function buildColorCache() {
         const brightnessLevels = new Uint32Array(BRIGHTNESS_LEVELS);
         const [r, g, b] = colorRGB[c];
         for (let bl = 0; bl < BRIGHTNESS_LEVELS; bl++) {
-            const factor = bl / 100;
+            const factor = bl / 200;
             const ri = (r * factor) | 0;
             const gi = (g * factor) | 0;
             const bi = (b * factor) | 0;
@@ -61,7 +61,7 @@ document.documentElement.style.setProperty("--ui-scale", fontScale);
 
 const frameRate = 10
 const frameInterval = 1000 / frameRate;
-const trailFade = 0.009; // closer to 1 = faster fade
+const trailFade = 0.005; // closer to 1 = faster fade
 const initialSpawnChance = 0.00005;
 let spawnChance = initialSpawnChance;
 const scoreboardInterval = 5;
@@ -554,8 +554,8 @@ let gridBuffer = [];
 let trailColor = [];
 let trailBrightness = [];
 
-// Trail fade as integer (0-100 scale)
-const trailFadeInt = Math.round(trailFade * 100);
+// Trail fade as integer (0-200 scale for slower fade)
+const trailFadeInt = Math.round(trailFade * 200);
 
 function resetGrid() {
     grid = [];
@@ -578,7 +578,7 @@ function resetGrid() {
                 const color = ((Math.random() * 4) | 0) + 1;
                 row[c] = color;
                 tColor[c] = color;
-                tBright[c] = 100; // Full brightness
+                tBright[c] = 200; // Full brightness
             }
         }
         grid.push(row);
@@ -613,7 +613,7 @@ function updateTrailAndDraw() {
             // Update trail state
             if (cell > 0) {
                 tColor[col] = cell;
-                brightness = 100;
+                brightness = 200;
             } else if (brightness > 0) {
                 brightness = brightness > trailFadeInt ? brightness - trailFadeInt : 0;
                 if (brightness === 0) tColor[col] = 0;
@@ -625,8 +625,8 @@ function updateTrailAndDraw() {
 
             if (brightness > 0) {
                 // Apply debug filters
-                if (!(debugTrailsOnly && brightness === 100) &&
-                    !(!debugShowTrails && brightness < 100)) {
+                if (!(debugTrailsOnly && brightness === 200) &&
+                    !(!debugShowTrails && brightness < 200)) {
                     pixel = colorCache32[tColor[col]][brightness];
                 }
             }
@@ -716,7 +716,7 @@ function spawnExplosion() {
                 ) {
                     grid[targetRow][targetCol] = color;
                     trailColor[targetRow][targetCol] = color;
-                    trailBrightness[targetRow][targetCol] = color > 0 ? 100 : 0;
+                    trailBrightness[targetRow][targetCol] = color > 0 ? 200 : 0;
                 }
             }
         }
@@ -1016,7 +1016,7 @@ async function applyServerState(state) {
                 for (let c = 0; c < grid[r].length; c++) {
                     const t = state.trailGrid[r][c];
                     tColor[c] = t.color;
-                    tBright[c] = Math.round(t.brightness * 100);
+                    tBright[c] = Math.round(t.brightness * 200);
                 }
                 trailColor.push(tColor);
                 trailBrightness.push(tBright);
@@ -1028,7 +1028,7 @@ async function applyServerState(state) {
                 for (let c = 0; c < grid[r].length; c++) {
                     const cell = grid[r][c];
                     tColor[c] = cell;
-                    tBright[c] = cell > 0 ? 100 : 0;
+                    tBright[c] = cell > 0 ? 200 : 0;
                 }
                 trailColor.push(tColor);
                 trailBrightness.push(tBright);

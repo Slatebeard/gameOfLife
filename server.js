@@ -93,7 +93,8 @@ let gameState = {
   actualTeamNames: ["", "", "", ""],
   isNightPalette: false,
   grid: null,
-  trailGrid: null,
+  trailColor: null,
+  trailBrightness: null,
   teamCounts: [0, 0, 0, 0, 0],
   gridDimensions: null,
   currentEvent: null,
@@ -255,7 +256,8 @@ function transitionState(newState, newPhase) {
         selectRandomPalette(false);
         selectRandomTeamNames();
         gameState.grid = null;
-        gameState.trailGrid = null;
+        gameState.trailColor = null;
+        gameState.trailBrightness = null;
         gameState.teamCounts = [0, 0, 0, 0, 0];
       }
       break;
@@ -263,7 +265,8 @@ function transitionState(newState, newPhase) {
       gameState.currentPhase = "ready";
       if (oldState === "preRun") {
         gameState.grid = null;
-        gameState.trailGrid = null;
+        gameState.trailColor = null;
+        gameState.trailBrightness = null;
         gameState.teamCounts = [0, 0, 0, 0, 0];
       }
       break;
@@ -326,7 +329,8 @@ function initializeServerState() {
       actualTeamNames: savedState.actualTeamNames || ["", "", "", ""],
       isNightPalette: savedState.isNightPalette || false,
       grid: savedState.grid || null,
-      trailGrid: savedState.trailGrid || null,
+      trailColor: savedState.trailColor || null,
+      trailBrightness: savedState.trailBrightness || null,
       teamCounts: savedState.teamCounts || [0, 0, 0, 0, 0],
       gridDimensions: savedState.gridDimensions || null,
       currentEvent: savedState.currentEvent || null,
@@ -409,7 +413,8 @@ app.get("/api/game", (c) => {
 
   if (includeGrid) {
     response.grid = gameState.grid;
-    response.trailGrid = gameState.trailGrid;
+    response.trailColor = gameState.trailColor;
+    response.trailBrightness = gameState.trailBrightness;
   }
 
   return c.json(response);
@@ -420,7 +425,8 @@ app.post("/api/game/grid", async (c) => {
 
   // Only accept grid updates, not state changes
   if (body.grid) gameState.grid = body.grid;
-  if (body.trailGrid) gameState.trailGrid = body.trailGrid;
+  if (body.trailColor) gameState.trailColor = body.trailColor;
+  if (body.trailBrightness) gameState.trailBrightness = body.trailBrightness;
   if (body.teamCounts) gameState.teamCounts = body.teamCounts;
   if (body.gridDimensions) gameState.gridDimensions = body.gridDimensions;
   if (body.currentEvent !== undefined) gameState.currentEvent = body.currentEvent;
@@ -533,7 +539,8 @@ app.post("/api/control/reset", (c) => {
     actualTeamNames: ["", "", "", ""],
     isNightPalette: false,
     grid: null,
-    trailGrid: null,
+    trailColor: null,
+    trailBrightness: null,
     teamCounts: [0, 0, 0, 0, 0],
     gridDimensions: null,
     currentEvent: null,
