@@ -76,6 +76,7 @@ let scheduleEnabled = false;
 // polling configuration
 const POLL_INTERVAL = 10000;
 const GRID_SEND_INTERVAL = 60000;
+const SKIP_GRID_SEND = true
 let lastKnownAdminVersion = 0;
 let isInitialLoad = true;
 
@@ -1133,7 +1134,9 @@ function startPolling() {
     if (gridSendTimer) clearInterval(gridSendTimer);
 
     pollTimer = setInterval(pollServer, POLL_INTERVAL);
-    gridSendTimer = setInterval(sendGridToServer, GRID_SEND_INTERVAL);
+    if (!SKIP_GRID_SEND) {
+        gridSendTimer = setInterval(sendGridToServer, GRID_SEND_INTERVAL);
+    }
 }
 
 async function initialize() {
