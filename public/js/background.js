@@ -15,8 +15,15 @@ const swirlIntensity = 2;
 const pixelSize = 18; // larger = more pixelated
 const noiseOctaves = 2; // fewer = less detail
 const opacity = 0.1; // 0-1, allows body color to show through
+const bgFrameRate = 20; // this animation is subtle, no need to run at full display refresh rate
+const bgFrameInterval = 1000 / bgFrameRate;
 
 let time = 0;
+let lastBgFrameTime = 0;
+
+// Allocated once and reused every frame instead of per-frame allocation
+const bgImageData = bgCtx.createImageData(bgCanvas.width, bgCanvas.height);
+const bgData = bgImageData.data;
 
 // Simplex-like noise using permutation table
 const perm = [];
@@ -76,9 +83,12 @@ function fbm(x, y, octaves) {
     return value / maxValue;
 }
 
-function drawBackground() {
-    const imageData = bgCtx.createImageData(bgCanvas.width, bgCanvas.height);
-    const data = imageData.data;
+function drawBackground(currentTime) {
+    requestAnimationFrame(drawBackground);
+
+    if (currentTime - lastBgFrameTime < bgFrameInterval) return;
+    lastBgFrameTime = currentTime;
+
     const alpha = Math.floor(opacity * 255);
 
     for (let y = 0; y < bgCanvas.height; y += pixelSize) {
@@ -100,19 +110,18 @@ function drawBackground() {
             for (let py = 0; py < pixelSize && y + py < bgCanvas.height; py++) {
                 for (let px = 0; px < pixelSize && x + px < bgCanvas.width; px++) {
                     const idx = ((y + py) * bgCanvas.width + (x + px)) * 4;
-                    data[idx] = brightness;
-                    data[idx + 1] = brightness;
-                    data[idx + 2] = brightness;
-                    data[idx + 3] = alpha;
+                    bgData[idx] = brightness;
+                    bgData[idx + 1] = brightness;
+                    bgData[idx + 2] = brightness;
+                    bgData[idx + 3] = alpha;
                 }
             }
         }
     }
 
-    bgCtx.putImageData(imageData, 0, 0);
+    bgCtx.putImageData(bgImageData, 0, 0);
 
     time += swirlSpeed;
-    requestAnimationFrame(drawBackground);
 }
 
-drawBackground();
+requestAnimationFrame(drawBackground);

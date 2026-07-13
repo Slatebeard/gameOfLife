@@ -3,6 +3,7 @@ import { serveStatic } from "@hono/node-server/serve-static";
 import { serve } from "@hono/node-server";
 import { getConnInfo } from "@hono/node-server/conninfo";
 import { readFileSync, writeFileSync, existsSync } from "fs";
+import { writeFile } from "fs/promises";
 import { networkInterfaces } from "os";
 
 function getLocalIP() {
@@ -193,14 +194,14 @@ function loadGameState() {
   return null;
 }
 
-function saveGameState() {
+async function saveGameState() {
   try {
     const stateToSave = {
       version: 1,
       ...gameState,
       savedAt: new Date().toISOString(),
     };
-    writeFileSync(STATE_FILE, JSON.stringify(stateToSave));
+    await writeFile(STATE_FILE, JSON.stringify(stateToSave));
   } catch (error) {
     console.error("Failed to save game state:", error);
   }
@@ -221,8 +222,8 @@ function debouncedSaveState() {
   if (saveStateTimeout) {
     clearTimeout(saveStateTimeout);
   }
-  saveStateTimeout = setTimeout(() => {
-    saveGameState();
+  saveStateTimeout = setTimeout(async () => {
+    await saveGameState();
     console.log(
       `[${new Date().toLocaleTimeString()}] State saved to disk: ${formatStateLog()}`,
     );
