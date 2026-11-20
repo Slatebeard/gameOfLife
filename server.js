@@ -3,7 +3,7 @@ import { serveStatic } from "@hono/node-server/serve-static";
 import { serve } from "@hono/node-server";
 import { getConnInfo } from "@hono/node-server/conninfo";
 import { readFileSync, writeFileSync, existsSync } from "fs";
-import { writeFile } from "fs/promises";
+import { readFile, writeFile } from "fs/promises";
 import { networkInterfaces } from "os";
 
 function getLocalIP() {
@@ -79,6 +79,8 @@ const STATS_FILE = "./data/stats.json";
 const STATE_FILE = "./data/gameState.json";
 const PALETTES_FILE = "./public/data/palettes.json";
 const TEAM_NAMES_FILE = "./public/data/teamNames.json";
+const LUNCH_MENU_FILE = process.env.LUNCH_MENU_FILE || "/home/user/lunchbot/menu.json";
+const LUNCH_MOCK_FILE = "./public/data/menus.mock.json";
 
 // ================================
 // SERVER-AUTHORITATIVE GAME STATE
@@ -484,6 +486,20 @@ app.get("/api/scores", (c) => {
 app.get("/api/stats", (c) => {
   const stats = loadStats();
   return c.json(stats);
+});
+
+// Lunch menu written by lunchbot, falls back to mock data if missing
+app.get("/api/lunch", async (c) => {
+  for (const file of [LUNCH_MENU_FILE, LUNCH_MOCK_FILE]) {
+    try {
+      const data = JSON.parse(await readFile(file, "utf-8"));
+      c.header("Cache-Control", "no-store");
+      return c.json(data);
+    } catch (error) {
+      console.error(`Failed to load lunch menu ${file}:`, error.message);
+    }
+  }
+  return c.json({ error: "No lunch menu available" }, 404);
 });
 
 app.get("/api/schedule", (c) => {
