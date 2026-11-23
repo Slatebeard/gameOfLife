@@ -12,6 +12,8 @@ const LUNCH_CHECK_INTERVAL = 15000;
 
 const lunchPanelEl = document.getElementById("lunch-panel");
 const lunchColumnsEl = document.getElementById("lunch-columns");
+const lunchTitleEl = lunchPanelEl.querySelector(".lunch-title");
+const DEFAULT_LUNCH_TITLE = "Where's the food?";
 
 // Keys are lowercase with spaces removed, see normalizeName()
 const RESTAURANT_COLORS = {
@@ -39,6 +41,7 @@ async function loadLunchMenus() {
 
 function renderLunchMenus(data) {
   lunchColumnsEl.replaceChildren();
+  lunchTitleEl.textContent = data?.greeting || DEFAULT_LUNCH_TITLE;
   const restaurants = data?.restaurants ?? [];
 
   if (restaurants.length === 0) {
@@ -60,9 +63,9 @@ function renderLunchMenus(data) {
     if (color) name.style.color = color;
     col.appendChild(name);
 
-    for (const item of restaurant.items ?? []) {
-      // Items are plain strings, e.g. "Dagens pasta" or a full sentence
-      const text = typeof item === "string" ? item : item?.name;
+    for (const dish of restaurant.dishes ?? []) {
+      // Dishes are plain strings, e.g. "Dagens pasta" or a full sentence
+      const text = typeof dish === "string" ? dish : dish?.name;
       if (!text) continue;
       const row = document.createElement("div");
       row.className = "lunch-item";

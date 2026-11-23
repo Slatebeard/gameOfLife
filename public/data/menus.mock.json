@@ -1,35 +1,37 @@
 {
-    "date": "2026-11-15",
-    "restaurants": [
-        {
-            "name": "Lunch House",
-            "items": [
-                "Rödvinsbräserad ryggbiff med rostad vitlökssås och béarnaise, serveras med krämig vitlökspotatisgratäng.",
-                "Husets egna ”Fish and Chips” med tartarsås och citron.",
-                "Krispig nachostekt kycklingfilé med salsasås och cheddardipp, serveras med pommes frites.",
-                "Hemgjorda kroppkakor med brynt smör, stekt rimmat sidfläsk och rårörda lingon.",
-                "Dagens pasta.",
-                "VEGETARISKT: Halloumiburgare i briochebröd med dressing, sallad, tomat och picklad lök, serveras med pommes frites."
-            ]
-        },
-        {
-            "name": "BredBar",
-            "items": [
-                "Schnitzel bea rödvinssås gröna ärtor stekt potatis kapris anjovis lökmix.",
-                "Laxfile vitvin o gräslöksås salladslök krossad potatis toppat med handskalade räkor.",
-                "Pasta (g) kycklingfilé champinjoner grana padano.",
-                "Vegetarisktpasta arrabiata toppad med krämig burrata.",
-                "Tipsköttbullar gräddsås inlagd gurka lingon kokt potatis."
-            ]
-        },
-        {
-            "name": "Villa Wera",
-            "items": [
-                "Fänkål, morot, tomat samt aioli.",
-                "Dubbel cheeseburgare med.",
-                "Bbq-glaze, picklad rödlök, saltgurka, sean connery-crème och pommes frites.",
-                "Timjansbakad persiljerot med gammel knascrème, matvete, gråärt och rucola."
-            ]
-        }
-    ]
+  "greeting": "Where's the Food?",
+  "restaurants": [
+    {
+      "name": "Lunch House",
+      "dishes": [
+        "Pepparstekt ryggbiff med cognacpepparsås, serveras med krämig vitlökspotatisgratäng och frästa gröna bönor",
+        "Husets egna ”Fish and Chips” med tartarsås och citron",
+        "Fläsknoisette med rödvinssås och béarnaise, serveras med pommes frites",
+        "Hemgjorda kroppkakor med brynt smör, stekt rimmat sidfläsk och rårörda lingon",
+        "Dagens pasta",
+        "VEGETARISKT: Halloumiburgare i briochebröd med dressing, sallad, tomat och picklad rödlök, serveras med pommes"
+      ]
+    },
+    {
+      "name": "BredBar",
+      "dishes": [
+        "Schnitzel bea rödvinssås gröna ärtor stekt potatis kapris anjovis lökmix",
+        "Teriyaki bakad laxfilé mango o gurksallad sjögräs ris chilimajo",
+        "Pasta strimlad biff svamp grana padano",
+        "Teriyaki tofu mango o gurksallad sjögräs ris chilimajo",
+        "Köttbullar gräddsås inlagd gurka lingon kokt potatis"
+      ]
+    },
+    {
+      "name": "Villa Wera",
+      "dishes": [
+        "Clam chowder med sej, fänkål, morot, gräslök och surdegskrutonger",
+        "Grillad kyckling med pommes frites, tryffelcréme",
+        "På gotlands tryffel, rödvinssky",
+        "Och picklad morot",
+        "Dragoncréme samt kikärtor och tomater"
+      ]
+    }
+  ],
+  "dayOfWeek": "FRIDAY"
 }
